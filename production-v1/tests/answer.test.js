@@ -201,6 +201,35 @@ test('answer service falls back deterministically to selected evidence and sourc
   assert.equal(first.citations.every((citation) => citation.url.endsWith('.hkbu.edu.hk/services/it-security/mfa.html')), true);
 });
 
+test('answer service retains current official evidence when the model omits evidence IDs', async () => {
+  const provider = {
+    provider: 'hkbu',
+    async generate() {
+      return {
+        rawText: JSON.stringify(validDraft({
+          evidenceIds: [],
+          actionIds: [],
+          groundingStatus: 'unverified',
+        })),
+        provider: 'vertex-ai',
+        latencyMs: 12,
+      };
+    },
+  };
+  const service = createAnswerService({ corpus, retriever, llmProvider: provider, now: () => FIXED_NOW });
+  const answer = await service.answer({
+    turnId: 'turn-model-omitted-evidence',
+    text: 'Duo changed phone',
+    context: [],
+    beforeProvider: async () => {},
+  });
+
+  assert.equal(answer.fallback, true);
+  assert.equal(answer.provider, 'deterministic');
+  assert.equal(answer.groundingStatus, 'verified');
+  assert.deepEqual(answer.citations.map(({ evidenceId }) => evidenceId), ['evidence.ito.duo.new-phone']);
+});
+
 test('clarification-required retrieval never lets a successful model invent current operating status', async () => {
   let providerCalls = 0;
   const freshNow = new Date('2026-08-26T12:00:00+08:00');

@@ -412,7 +412,9 @@ export function createAnswerService({ corpus, retriever, llmProvider, now = () =
         actionSnapshot: reference.actions,
         now: asInstant(now()),
       });
-      if (draft.evidenceIds.length === 0) return unverifiedAnswer(retrieval, corpus, language);
+      if (draft.evidenceIds.length === 0) {
+        return groundedFallback(retrieval, corpus, language, reference.evidence, asInstant(now()));
+      }
       return {
         ...mapValidatedDraft(draft, corpus, {
           language,
