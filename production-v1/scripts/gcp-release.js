@@ -83,6 +83,7 @@ const ACCEPTANCE_SERVICE_ACCOUNT = GCP_IDENTITY.serviceAccounts.acceptance;
 const PROMOTION_AUTHORITY = 'admin@motionexp.com';
 const CANDIDATE_INVOKER_ROLE = 'roles/run.servicesInvoker';
 const OCI_SOURCE = 'https://github.com/jimmy00415/Cantonese_Learning_Full_stack';
+const MAX_CONTROLLED_WORKLOAD_REQUESTS = 20_000;
 
 function createDefaultIdentityTokenExecutor(environment) {
   return createIdentityTokenExecutor({
@@ -4373,7 +4374,7 @@ function validateReceiptOutputs(phase, outputs, plan, { candidatePrivacyReferenc
         || !DIGEST.test(String(outputs.execution.networkWitnessSha256 ?? ''))
         || !Number.isSafeInteger(outputs.execution.observedRequestCount)
         || outputs.execution.observedRequestCount < 500
-        || outputs.execution.observedRequestCount > 5_000))
+        || outputs.execution.observedRequestCount > MAX_CONTROLLED_WORKLOAD_REQUESTS))
       || (phase === 'mobile' && !exact(outputs.access, plan.candidateAccess))
       || (phase === 'mobile' && !exact(outputs.viewport, { width: 390, height: 844 }))) {
       throw new Error('Task 8 release receipt outputs are invalid');
@@ -6365,7 +6366,8 @@ function createControlledWorkloadFetch(fetchImpl, plan, ledger) {
     const rawUrl = input instanceof URL ? input.href
       : typeof input === 'string' ? input : input?.url;
     const url = new URL(rawUrl);
-    if (url.origin !== plan.candidateOrigin || url.username || url.password || ledger.length >= 5_000) {
+    if (url.origin !== plan.candidateOrigin || url.username || url.password
+      || ledger.length >= MAX_CONTROLLED_WORKLOAD_REQUESTS) {
       throw new Error('Controlled workload request is outside the candidate boundary');
     }
     const method = String(init?.method ?? input?.method ?? 'GET').toUpperCase();
@@ -6408,7 +6410,8 @@ function exactStringSet(values, expected) {
 }
 
 function validateControlledWorkloadNetwork(ledger, record) {
-  if (!Array.isArray(ledger) || ledger.length < 500 || ledger.length > 5_000
+  if (!Array.isArray(ledger) || ledger.length < 500
+    || ledger.length > MAX_CONTROLLED_WORKLOAD_REQUESTS
     || ledger.some((entry, index) => entry.sequence !== index + 1)
     || containsForbiddenPersistedSecret(ledger)) {
     throw new Error('Controlled workload network witness is invalid');

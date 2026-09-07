@@ -829,7 +829,9 @@ function controlPlaneLogEntries(record) {
   }));
 }
 
-async function exerciseControlledWorkloadNetwork(fetchImpl, record) {
+async function exerciseControlledWorkloadNetwork(fetchImpl, record, {
+  messageReadCount = 231,
+} = {}) {
   const invoke = (path, method = 'GET', headers = {}) => fetchImpl(
     new URL(path, CANDIDATE_ORIGIN), { method, headers: {
       ...headers,
@@ -843,7 +845,9 @@ async function exerciseControlledWorkloadNetwork(fetchImpl, record) {
       'X-Acceptance-Correlation-Id': record.rawReceipts.textTurns[index].correlationId,
     });
   }
-  for (let index = 0; index < 231; index += 1) await invoke('/api/v1/messages?after=0');
+  for (let index = 0; index < messageReadCount; index += 1) {
+    await invoke('/api/v1/messages?after=0');
+  }
   for (let index = 0; index < 30; index += 1) {
     await invoke('/api/v1/voice/transcriptions', 'POST', {
       'X-Client-Upload-Id': record.rawReceipts.asrRequests[index].bindingId,
@@ -9806,7 +9810,9 @@ test('workload receipt is created only by one controlled immutable run with witn
       assert.equal(options.environment.V1_SOURCE_ARCHIVE_SHA256, SOURCE_SHA);
       assert.equal(options.environment.V1_CANDIDATE_IMAGE_DIGEST, IMAGE_DIGEST);
       assert.equal(options.environment.V1_CANDIDATE_REVISION, REVISION);
-      await exerciseControlledWorkloadNetwork(options.fetchImpl, record);
+      await exerciseControlledWorkloadNetwork(options.fetchImpl, record, {
+        messageReadCount: 5_100,
+      });
       await options.writeArtifact({
         filePath: join(directory, `${RELEASE_SHA}-${record.artifactSha256}.json`), contents, record,
       });
