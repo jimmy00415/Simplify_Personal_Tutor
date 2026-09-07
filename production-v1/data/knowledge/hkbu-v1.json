@@ -426,32 +426,32 @@
       "title": "Catering Services",
       "publisher": "HKBU Estates Office",
       "canonicalUrl": "https://eo.hkbu.edu.hk/eo-services/services-facilities/Catering-Services.html",
-      "verifiedAt": "2026-08-26T11:30:00+08:00",
+      "verifiedAt": "2026-09-07T23:44:46+08:00",
       "risk": "time_sensitive",
-      "sourceGovernance": {"ownerOffice":"HKBU Estates Office","categories":["dining","dining_inventory"],"languages":["en"],"volatility":"weekly","reviewCadence":"weekly","evidenceWindowDays":7,"reviewAttestation":{"reviewer":"HKBU first-party source review 2026-08-26","reviewedAt":"2026-08-26T11:30:00+08:00","captureMethod":"manual_review","sourceHash":null}},
+      "sourceGovernance": {"ownerOffice":"HKBU Estates Office","categories":["dining","dining_inventory"],"languages":["en"],"volatility":"weekly","reviewCadence":"weekly","evidenceWindowDays":7,"reviewAttestation":{"reviewer":"HKBU first-party source review 2026-09-07","reviewedAt":"2026-09-07T23:44:46+08:00","captureMethod":"manual_review","sourceHash":null}},
       "intentGroups": ["dining", "dining_inventory"],
       "tags": ["catering outlets", "summer break", "special operating hours", "飯堂", "饭堂"],
       "exampleQuestions": ["What food outlets are on campus?", "暑假飯堂開唔開", "暑假食堂开不开"],
       "claims": [{
         "id": "evidence.eo.dining-overview.special-hours", "text": {"en": "HKBU lists catering outlets by campus and publishes separate summer-break and bad-weather arrangements; regular outlet hours alone do not prove today's hours.", "zhHant": "浸大按校區列出餐飲店，並另發暑假及惡劣天氣安排；單憑常規時間不能確認今日營業。", "zhHans": "浸大按校区列出餐饮店，并另发暑假及恶劣天气安排；仅凭常规时间不能确认今日营业。"},
         "sourceId": "hkbu.eo.dining-overview", "sourceLocator": "Catering Services: Special Operating Hours and Catering Outlets", "evidenceNote": "Reviewed override links and outlet grouping; retrieval must clarify current special hours.",
-        "verifiedAt": "2026-08-25T12:00:00+08:00", "validFrom": null, "validUntil": null, "reviewAfter": "2026-09-01T23:59:59+08:00", "volatility": "weekly", "verificationStatus": "official_verified", "facts": {"specialHoursOverrideRegular": true}, "keywords": ["outlets", "summer", "special hours", "暑假", "惡劣天氣", "恶劣天气"],
-        "reviewAttestation": {"reviewer": "HKBU source review 2026-08-25", "reviewedAt": "2026-08-25T12:00:00+08:00", "sourceLocator": "Catering Services: Special Operating Hours and Catering Outlets", "captureMethod": "manual_review", "sourceHash": null}
+        "verifiedAt": "2026-08-25T12:00:00+08:00", "validFrom": null, "validUntil": null, "reviewAfter": "2026-09-14T23:44:46+08:00", "volatility": "weekly", "verificationStatus": "official_verified", "facts": {"specialHoursOverrideRegular": true}, "keywords": ["outlets", "summer", "special hours", "暑假", "惡劣天氣", "恶劣天气"],
+        "reviewAttestation": {"reviewer": "HKBU first-party source review 2026-09-07", "reviewedAt": "2026-09-07T23:44:46+08:00", "sourceLocator": "Catering Services: Special Operating Hours and Catering Outlets", "captureMethod": "manual_review", "sourceHash": null}
       }, {
         "id": "evidence.eo.dining-inventory.jc3", "text": {"en": "The JC³ catering inventory lists UG/F Cafe and G/F Cafe; this inventory does not establish current opening status.", "zhHant": "JC³ 餐飲店清單列有 UG/F Cafe 及 G/F Cafe；清單不能證明現時營業狀態。", "zhHans": "JC³ 餐饮店清单列有 UG/F Cafe 及 G/F Cafe；清单不能证明目前营业状态。"},
         "sourceId": "hkbu.eo.dining-overview", "sourceLocator": "Catering Outlets: Jockey Club Campus of Creativity", "evidenceNote": "Manually reviewed the campus-grouped outlet inventory; live status was deliberately excluded.",
-        "verifiedAt": "2026-08-26T11:30:00+08:00", "validFrom": null, "validUntil": null, "reviewAfter": "2026-09-02T23:59:59+08:00", "volatility": "weekly", "verificationStatus": "official_verified", "facts": {"inventoryOnly": true, "campus": "JC3"}, "keywords": ["jc3", "jc³", "jockey club campus of creativity"],
-        "reviewAttestation": {"reviewer": "HKBU first-party source review 2026-08-26", "reviewedAt": "2026-08-26T11:30:00+08:00", "sourceLocator": "Catering Outlets: Jockey Club Campus of Creativity", "captureMethod": "manual_review", "sourceHash": null}
+        "verifiedAt": "2026-08-26T11:30:00+08:00", "validFrom": null, "validUntil": null, "reviewAfter": "2026-09-14T23:44:46+08:00", "volatility": "weekly", "verificationStatus": "official_verified", "facts": {"inventoryOnly": true, "campus": "JC3"}, "keywords": ["jc3", "jc³", "jockey club campus of creativity"],
+        "reviewAttestation": {"reviewer": "HKBU first-party source review 2026-09-07", "reviewedAt": "2026-09-07T23:44:46+08:00", "sourceLocator": "Catering Outlets: Jockey Club Campus of Creativity", "captureMethod": "manual_review", "sourceHash": null}
       }, {
         "id": "evidence.eo.dining-inventory.ho-sin-hang", "text": {"en": "The Ho Sin Hang Campus catering inventory lists Harmony Cafeteria and Harmony Lounge; this inventory does not establish current opening status.", "zhHant": "善衡校園餐飲店清單列有 Harmony Cafeteria 及 Harmony Lounge；清單不能證明現時營業狀態。", "zhHans": "善衡校园餐饮店清单列有 Harmony Cafeteria 及 Harmony Lounge；清单不能证明目前营业状态。"},
         "sourceId": "hkbu.eo.dining-overview", "sourceLocator": "Catering Outlets: Ho Sin Hang Campus", "evidenceNote": "Manually reviewed the campus-grouped outlet inventory; live status was deliberately excluded.",
-        "verifiedAt": "2026-08-26T11:30:00+08:00", "validFrom": null, "validUntil": null, "reviewAfter": "2026-09-02T23:59:59+08:00", "volatility": "weekly", "verificationStatus": "official_verified", "facts": {"inventoryOnly": true, "campus": "Ho Sin Hang Campus"}, "keywords": ["ho sin hang campus", "善衡校園", "善衡校园"],
-        "reviewAttestation": {"reviewer": "HKBU first-party source review 2026-08-26", "reviewedAt": "2026-08-26T11:30:00+08:00", "sourceLocator": "Catering Outlets: Ho Sin Hang Campus", "captureMethod": "manual_review", "sourceHash": null}
+        "verifiedAt": "2026-08-26T11:30:00+08:00", "validFrom": null, "validUntil": null, "reviewAfter": "2026-09-14T23:44:46+08:00", "volatility": "weekly", "verificationStatus": "official_verified", "facts": {"inventoryOnly": true, "campus": "Ho Sin Hang Campus"}, "keywords": ["ho sin hang campus", "善衡校園", "善衡校园"],
+        "reviewAttestation": {"reviewer": "HKBU first-party source review 2026-09-07", "reviewedAt": "2026-09-07T23:44:46+08:00", "sourceLocator": "Catering Outlets: Ho Sin Hang Campus", "captureMethod": "manual_review", "sourceHash": null}
       }, {
         "id": "evidence.eo.dining-inventory.burc", "text": {"en": "The Baptist University Road Campus catering inventory lists Books 'n Bites, Main Canteen, Cafe@CVA Commons, BU Fiesta, Bistro NTT, and Deli; this inventory does not establish current opening status.", "zhHant": "浸會大學道校園餐飲店清單列有 Books 'n Bites、Main Canteen、Cafe@CVA Commons、BU Fiesta、Bistro NTT 及 Deli；清單不能證明現時營業狀態。", "zhHans": "浸会大学道校园餐饮店清单列有 Books 'n Bites、Main Canteen、Cafe@CVA Commons、BU Fiesta、Bistro NTT 及 Deli；清单不能证明目前营业状态。"},
         "sourceId": "hkbu.eo.dining-overview", "sourceLocator": "Catering Outlets: Baptist University Road Campus", "evidenceNote": "Manually reviewed the exact campus-grouped outlet inventory; live status was deliberately excluded.",
-        "verifiedAt": "2026-08-26T11:30:00+08:00", "validFrom": null, "validUntil": null, "reviewAfter": "2026-09-02T23:59:59+08:00", "volatility": "weekly", "verificationStatus": "official_verified", "facts": {"inventoryOnly": true, "campus": "Baptist University Road Campus"}, "keywords": ["baptist university road campus", "浸會大學道校園", "浸会大学道校园", "burc"],
-        "reviewAttestation": {"reviewer": "HKBU first-party source review 2026-08-26", "reviewedAt": "2026-08-26T11:30:00+08:00", "sourceLocator": "Catering Outlets: Baptist University Road Campus", "captureMethod": "manual_review", "sourceHash": null}
+        "verifiedAt": "2026-08-26T11:30:00+08:00", "validFrom": null, "validUntil": null, "reviewAfter": "2026-09-14T23:44:46+08:00", "volatility": "weekly", "verificationStatus": "official_verified", "facts": {"inventoryOnly": true, "campus": "Baptist University Road Campus"}, "keywords": ["baptist university road campus", "浸會大學道校園", "浸会大学道校园", "burc"],
+        "reviewAttestation": {"reviewer": "HKBU first-party source review 2026-09-07", "reviewedAt": "2026-09-07T23:44:46+08:00", "sourceLocator": "Catering Outlets: Baptist University Road Campus", "captureMethod": "manual_review", "sourceHash": null}
       }]
     },
     {

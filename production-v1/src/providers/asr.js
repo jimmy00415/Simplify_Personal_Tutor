@@ -9,6 +9,7 @@ import {
 } from './speech-common.js';
 import { GCP_IDENTITY } from '../gcp-identity.js';
 import { createGoogleAccessTokenProvider } from './google-auth.js';
+import { CANONICAL_WAV } from '../media/canonical-wav.js';
 
 const AZURE_REGION = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const NO_MATCH = new Set(['NoMatch', 'InitialSilenceTimeout', 'BabbleTimeout']);
@@ -17,6 +18,64 @@ const GOOGLE_RESPONSE_LANGUAGES = Object.freeze({
   'yue-Hant-HK': 'yue-Hant-HK',
   'cmn-Hans-CN': 'cmn-Hans-CN',
 });
+const GOOGLE_CHUNK_PCM_BYTES = 10 * CANONICAL_WAV.byteRate;
+
+function canonicalPcmBytes(buffer) {
+  if (buffer.length < CANONICAL_WAV.headerBytes
+    || buffer.subarray(0, 4).toString('ascii') !== 'RIFF'
+    || buffer.subarray(8, 12).toString('ascii') !== 'WAVE'
+    || buffer.subarray(12, 16).toString('ascii') !== 'fmt '
+    || buffer.subarray(36, 40).toString('ascii') !== 'data') return null;
+  const pcmBytes = buffer.readUInt32LE(40);
+  return buffer.readUInt32LE(4) === buffer.length - 8
+    && buffer.readUInt32LE(16) === 16
+    && buffer.readUInt16LE(20) === CANONICAL_WAV.format
+    && buffer.readUInt16LE(22) === CANONICAL_WAV.channels
+    && buffer.readUInt32LE(24) === CANONICAL_WAV.sampleRate
+    && buffer.readUInt32LE(28) === CANONICAL_WAV.byteRate
+    && buffer.readUInt16LE(32) === CANONICAL_WAV.blockAlign
+    && buffer.readUInt16LE(34) === CANONICAL_WAV.bitsPerSample
+    && pcmBytes > 0
+    && pcmBytes % CANONICAL_WAV.blockAlign === 0
+    && CANONICAL_WAV.headerBytes + pcmBytes === buffer.length
+    ? pcmBytes
+    : null;
+}
+
+function canonicalWavChunk(buffer, pcmOffset, pcmBytes) {
+  const chunk = Buffer.allocUnsafe(CANONICAL_WAV.headerBytes + pcmBytes);
+  buffer.copy(chunk, 0, 0, CANONICAL_WAV.headerBytes);
+  chunk.writeUInt32LE(chunk.length - 8, 4);
+  chunk.writeUInt32LE(pcmBytes, 40);
+  buffer.copy(
+    chunk,
+    CANONICAL_WAV.headerBytes,
+    CANONICAL_WAV.headerBytes + pcmOffset,
+    CANONICAL_WAV.headerBytes + pcmOffset + pcmBytes,
+  );
+  return chunk;
+}
+
+function googleAudioChunks(buffer) {
+  const pcmBytes = canonicalPcmBytes(buffer);
+  if (pcmBytes === null || pcmBytes <= GOOGLE_CHUNK_PCM_BYTES) return [buffer];
+  const chunks = [];
+  for (let offset = 0; offset < pcmBytes; offset += GOOGLE_CHUNK_PCM_BYTES) {
+    chunks.push(canonicalWavChunk(buffer, offset, Math.min(GOOGLE_CHUNK_PCM_BYTES, pcmBytes - offset)));
+  }
+  return chunks;
+}
+
+function combineGoogleResults(results) {
+  if (results.length === 1) return results[0];
+  const confidences = results.map(({ confidence }) => confidence).filter(Number.isFinite);
+  return {
+    transcript: results.map(({ transcript }) => transcript).join(' ').trim(),
+    confidence: confidences.length > 0
+      ? confidences.reduce((total, confidence) => total + confidence, 0) / confidences.length
+      : null,
+  };
+}
 
 function azureAsrUrl(region) {
   if (!AZURE_REGION.test(String(region ?? ''))) throw speechError('VOICE_PROVIDER_MISCONFIGURED', 503, false, 'configuration');
@@ -119,44 +178,48 @@ export function createAsrProvider({
         signal,
         deadlineMs: totalDeadlineMs,
         operation: async (deadlineSignal) => {
-          let response;
-          try {
-            const requestBody = google ? JSON.stringify({
-              config: {
-                autoDecodingConfig: {},
-                model: config.settings.model,
-                languageCodes: googleLanguages,
-              },
-              content: buffer.toString('base64'),
-            }) : buffer;
-            const providerFetch = googleAuthProvider?.fetch ?? fetchImpl;
-            response = await providerFetch(url, {
-              method: 'POST',
-              headers: google ? {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              } : {
-                'Ocp-Apim-Subscription-Key': config.settings.apiKey,
-                'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
-                Accept: 'application/json',
-              },
-              body: requestBody,
-              signal: deadlineSignal,
-              redirect: 'error',
-            });
-          } catch (error) {
-            if (deadlineSignal.aborted) throw error;
-            if (error?.code === 'GOOGLE_AUTHENTICATION_FAILED') {
-              throw speechError('VOICE_PROVIDER_MISCONFIGURED', 503, false, 'authentication');
+          const recognize = async (requestBuffer) => {
+            let response;
+            try {
+              const requestBody = google ? JSON.stringify({
+                config: {
+                  autoDecodingConfig: {},
+                  model: config.settings.model,
+                  languageCodes: googleLanguages,
+                },
+                content: requestBuffer.toString('base64'),
+              }) : requestBuffer;
+              const providerFetch = googleAuthProvider?.fetch ?? fetchImpl;
+              response = await providerFetch(url, {
+                method: 'POST',
+                headers: google ? {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                } : {
+                  'Ocp-Apim-Subscription-Key': config.settings.apiKey,
+                  'Content-Type': 'audio/wav; codecs=audio/pcm; samplerate=16000',
+                  Accept: 'application/json',
+                },
+                body: requestBody,
+                signal: deadlineSignal,
+                redirect: 'error',
+              });
+            } catch (error) {
+              if (deadlineSignal.aborted) throw error;
+              if (error?.code === 'GOOGLE_AUTHENTICATION_FAILED') {
+                throw speechError('VOICE_PROVIDER_MISCONFIGURED', 503, false, 'authentication');
+              }
+              throw speechError('VOICE_TRANSCRIPTION_FAILED', 502, true, 'network');
             }
-            throw speechError('VOICE_TRANSCRIPTION_FAILED', 502, true, 'network');
-          }
-          const body = await readBoundedResponse(response, SPEECH_LIMITS.asrResponseBytes, deadlineSignal);
-          if (!response.ok) throw statusError(response.status);
-          if (responseContentType(response) !== 'application/json') {
-            throw speechError('VOICE_PROVIDER_INVALID_RESPONSE', 502, false, 'invalid_response');
-          }
-          return google ? parseGooglePayload(body) : parseAzurePayload(body);
+            const body = await readBoundedResponse(response, SPEECH_LIMITS.asrResponseBytes, deadlineSignal);
+            if (!response.ok) throw statusError(response.status);
+            if (responseContentType(response) !== 'application/json') {
+              throw speechError('VOICE_PROVIDER_INVALID_RESPONSE', 502, false, 'invalid_response');
+            }
+            return google ? parseGooglePayload(body) : parseAzurePayload(body);
+          };
+          if (!google) return recognize(buffer);
+          return combineGoogleResults(await Promise.all(googleAudioChunks(buffer).map(recognize)));
         },
       });
       const normalized = { ...result, provider: config.provider, latencyMs: Math.max(0, now() - startedAt) };

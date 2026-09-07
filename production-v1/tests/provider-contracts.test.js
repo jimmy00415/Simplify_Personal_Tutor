@@ -18,6 +18,26 @@ import {
 const SMOKE_COMMIT = 'a'.repeat(40);
 const SMOKE_NOW = new Date('2026-08-25T12:00:00.000Z');
 
+function canonicalWavFixture(durationSeconds) {
+  const pcmBytes = durationSeconds * 32_000;
+  const wav = Buffer.alloc(44 + pcmBytes);
+  wav.write('RIFF', 0, 'ascii');
+  wav.writeUInt32LE(wav.length - 8, 4);
+  wav.write('WAVE', 8, 'ascii');
+  wav.write('fmt ', 12, 'ascii');
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(16_000, 24);
+  wav.writeUInt32LE(32_000, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36, 'ascii');
+  wav.writeUInt32LE(pcmBytes, 40);
+  for (let offset = 44; offset < wav.length; offset += 1) wav[offset] = (offset - 44) % 251;
+  return wav;
+}
+
 const TURN_INPUT = Object.freeze({
   turnId: 'turn-123',
   systemPrompt: 'Return one strict JSON object.',
@@ -242,6 +262,43 @@ test('Google STT rejects unsupported response locales before ADC transport', asy
     (error) => error.code === 'VOICE_TRANSCRIPTION_REJECTED' && error.retryable === false,
   );
   assert.equal(requests, 0);
+});
+
+test('Google STT V2 recognizes long canonical WAV chunks concurrently and preserves transcript order', async () => {
+  const requests = [];
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const asr = createAsrProvider({
+    config: { provider: 'google-stt-v2', settings: {
+      projectId: 'motion-expert-hk-ltd-webpage', location: 'asia-southeast1', model: 'chirp_2', recognizer: '_',
+      languageCodes: ['yue-Hant-HK', 'en-US', 'cmn-Hans-CN'], credentialVersion: 'runtime-sa-rotation-v1',
+    } },
+    googleAuthProvider: {
+      fetch: async (url, init) => {
+        const index = requests.length + 1;
+        requests.push({ url, init });
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return new Response(JSON.stringify({
+          results: [{ alternatives: [{ transcript: `part-${index}`, confidence: 0.9 }] }],
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+    },
+  });
+
+  const original = canonicalWavFixture(30);
+  const result = await asr.transcribe(original, { responseLanguage: 'en' });
+
+  assert.equal(requests.length, 3);
+  assert.equal(maxInFlight, 3);
+  const chunks = requests.map(({ init }) => Buffer.from(JSON.parse(init.body).content, 'base64'));
+  assert.equal(chunks.every((chunk) => chunk.subarray(0, 4).toString('ascii') === 'RIFF'), true);
+  assert.equal(chunks.every((chunk) => chunk.readUInt32LE(40) <= 10 * 32_000), true);
+  assert.equal(chunks.reduce((total, chunk) => total + chunk.readUInt32LE(40), 0), 30 * 32_000);
+  assert.equal(Buffer.concat(chunks.map((chunk) => chunk.subarray(44))).equals(original.subarray(44)), true);
+  assert.equal(result.transcript, 'part-1 part-2 part-3');
 });
 
 test('legacy Cantonese-only TTS adapters reject English and Mandarin before provider transport', async () => {

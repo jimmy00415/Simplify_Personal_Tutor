@@ -79,3 +79,13 @@ test('every shipped starter prompt reaches useful reviewed campus evidence end t
     }
   }
 });
+
+test('the production acceptance JC³ inventory remains within its reviewed evidence window', async () => {
+  const corpus = await loadDefaultCorpus();
+  const retriever = createRetriever({ corpus, now: () => new Date('2026-09-07T23:44:46+08:00') });
+  const retrieval = retriever.retrieve('What food outlets are at JC³?');
+  assert.deepEqual(
+    retrieval.supportableClaims.map((claim) => claim.id),
+    ['evidence.eo.dining-inventory.jc3'],
+  );
+});

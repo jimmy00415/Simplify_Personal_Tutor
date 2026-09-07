@@ -833,6 +833,7 @@ test('a candidate redeploy during the workload is detected with the existing ses
 test('real HTTP requester never re-synthesizes cached TTS and binds status/media to the requested message', async () => {
   let clock = 0;
   const requests = [];
+  let audioStatusRequests = 0;
   const mp3 = canonicalMp3Fixture();
   const fetchImpl = async (url, options = {}) => {
     const path = new URL(url).pathname;
@@ -846,7 +847,13 @@ test('real HTTP requester never re-synthesizes cached TTS and binds status/media
       return new Response(JSON.stringify({ data: { state: 'ready' }, error: null }), { status: 201 });
     }
     if (path.endsWith('/audio/status')) {
+      audioStatusRequests += 1;
       clock += 4_000;
+      if (audioStatusRequests === 1) {
+        return new Response(JSON.stringify({ data: {
+          messageId: 'assistant-1', state: 'pending', mediaId: null,
+        }, error: null }), { status: 200 });
+      }
       return new Response(JSON.stringify({ data: {
         messageId: 'assistant-1', state: 'ready', mediaId: '99999999-9999-4999-8999-999999999999',
       }, error: null }), { status: 200 });
@@ -900,6 +907,7 @@ test('real HTTP requester never re-synthesizes cached TTS and binds status/media
   assert.equal(tts.textAvailable, true);
   assert.equal(tts.mediaValidated, true);
   assert.equal(tts.messageIdMatches, true);
+  assert.equal(audioStatusRequests, 2);
   assert.equal(requests.some(({ path, method }) => path.endsWith('/audio') && method === 'POST'), false);
 
   const mismatchedRequester = createLatencyHttpRequester({

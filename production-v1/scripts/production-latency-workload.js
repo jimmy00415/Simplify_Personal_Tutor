@@ -1321,6 +1321,9 @@ export function createLatencyHttpRequester({
         if (response.status === 404) return { done: false };
         if (response.status === 202) return { done: false };
         const messageIdMatches = body?.data?.messageId === input.assistantMessageId;
+        if (response.status === 200 && messageIdMatches && body?.data?.state === 'pending') {
+          return { done: false };
+        }
         if (response.status === 200 && messageIdMatches && body?.data?.state === 'ready') {
           return { done: true, ready: true, mediaId: body.data.mediaId, messageIdMatches };
         }
