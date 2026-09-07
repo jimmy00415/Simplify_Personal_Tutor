@@ -67,10 +67,12 @@ function googleAudioChunks(buffer) {
 }
 
 function combineGoogleResults(results) {
-  if (results.length === 1) return results[0];
-  const confidences = results.map(({ confidence }) => confidence).filter(Number.isFinite);
+  const recognizedResults = results.filter(Boolean);
+  if (recognizedResults.length === 0) throw speechError('VOICE_SPEECH_NOT_RECOGNIZED', 422, false, 'no_match');
+  if (recognizedResults.length === 1) return recognizedResults[0];
+  const confidences = recognizedResults.map(({ confidence }) => confidence).filter(Number.isFinite);
   return {
-    transcript: results.map(({ transcript }) => transcript).join(' ').trim(),
+    transcript: recognizedResults.map(({ transcript }) => transcript).join(' ').trim(),
     confidence: confidences.length > 0
       ? confidences.reduce((total, confidence) => total + confidence, 0) / confidences.length
       : null,
@@ -219,7 +221,17 @@ export function createAsrProvider({
             return google ? parseGooglePayload(body) : parseAzurePayload(body);
           };
           if (!google) return recognize(buffer);
-          return combineGoogleResults(await Promise.all(googleAudioChunks(buffer).map(recognize)));
+          const chunks = googleAudioChunks(buffer);
+          if (chunks.length === 1) return recognize(buffer);
+          const results = await Promise.all(chunks.map(async (chunk) => {
+            try {
+              return await recognize(chunk);
+            } catch (error) {
+              if (error instanceof SpeechProviderError && error.code === 'VOICE_SPEECH_NOT_RECOGNIZED') return null;
+              throw error;
+            }
+          }));
+          return combineGoogleResults(results);
         },
       });
       const normalized = { ...result, provider: config.provider, latencyMs: Math.max(0, now() - startedAt) };

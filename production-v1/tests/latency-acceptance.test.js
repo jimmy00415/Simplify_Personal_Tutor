@@ -855,7 +855,7 @@ test('real HTTP requester never re-synthesizes cached TTS and binds status/media
         }, error: null }), { status: 200 });
       }
       return new Response(JSON.stringify({ data: {
-        messageId: 'assistant-1', state: 'ready', mediaId: '99999999-9999-4999-8999-999999999999',
+        messageId: 'assistant-1', state: 'attached', mediaId: '99999999-9999-4999-8999-999999999999',
       }, error: null }), { status: 200 });
     }
     if (path.endsWith('/media/99999999-9999-4999-8999-999999999999')) {

@@ -123,6 +123,7 @@ test('answer service maps immutable wire locales to trusted provider instruction
   assert.match(observed[0].systemPrompt, /international English/i);
   assert.match(observed[1].systemPrompt, /written Cantonese.*Traditional Chinese/i);
   assert.match(observed[2].systemPrompt, /Mandarin.*Simplified Chinese/i);
+  assert.match(observed[0].systemPrompt, /groundingStatus must be exactly "verified" or "unverified"/);
   await assert.rejects(
     service.answer({ turnId: 'bad-locale', text: 'Duo changed phone', replyLanguage: 'fr', context: [] }),
     /unsupported reply language/i,

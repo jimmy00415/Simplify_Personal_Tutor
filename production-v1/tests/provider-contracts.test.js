@@ -301,6 +301,39 @@ test('Google STT V2 recognizes long canonical WAV chunks concurrently and preser
   assert.equal(result.transcript, 'part-1 part-2 part-3');
 });
 
+test('Google STT V2 ignores silent long-audio chunks but still rejects wholly unrecognized speech', async () => {
+  const config = { provider: 'google-stt-v2', settings: {
+    projectId: 'motion-expert-hk-ltd-webpage', location: 'asia-southeast1', model: 'chirp_2', recognizer: '_',
+    languageCodes: ['yue-Hant-HK', 'en-US', 'cmn-Hans-CN'], credentialVersion: 'runtime-sa-rotation-v1',
+  } };
+  let requests = 0;
+  const partlySilent = createAsrProvider({
+    config,
+    googleAuthProvider: {
+      fetch: async () => {
+        requests += 1;
+        const results = requests === 2 ? [] : [{ alternatives: [{ transcript: `spoken-${requests}` }] }];
+        return new Response(JSON.stringify({ results }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      },
+    },
+  });
+  const partial = await partlySilent.transcribe(canonicalWavFixture(30), { responseLanguage: 'en' });
+  assert.equal(partial.transcript, 'spoken-1 spoken-3');
+
+  const whollySilent = createAsrProvider({
+    config,
+    googleAuthProvider: { fetch: async () => new Response(JSON.stringify({ results: [] }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }) },
+  });
+  await assert.rejects(
+    whollySilent.transcribe(canonicalWavFixture(30), { responseLanguage: 'en' }),
+    (error) => error.code === 'VOICE_SPEECH_NOT_RECOGNIZED',
+  );
+});
+
 test('legacy Cantonese-only TTS adapters reject English and Mandarin before provider transport', async () => {
   const configurations = [
     { provider: 'azure', settings: { apiKey: 'azure-key', region: 'eastasia' } },
