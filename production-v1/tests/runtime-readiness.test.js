@@ -262,3 +262,35 @@ test('dispatcher keeps its poll timer referenced for an always-on production wor
   await dispatcher.stop();
   assert.deepEqual(cleared, [scheduled[0]]);
 });
+
+test('dispatcher kick performs an immediate durable poll without waiting for its timer', async () => {
+  let claims = 0;
+  let processed = 0;
+  const scheduled = [];
+  const dispatcher = createDispatcher({
+    store: {
+      dispatcherHealthCheck: async () => ({ ok: true, driver: 'postgres', capability: 'turn-claim' }),
+      claimNextTurn: async () => {
+        claims += 1;
+        return claims === 1 ? { id: 'turn-one' } : null;
+      },
+      renewTurnLease: async () => true,
+    },
+    processTurn: async () => { processed += 1; },
+    pollIntervalMs: 60_000,
+    setTimeoutFn(callback, delay) {
+      const handle = { callback, delay, unref() {} };
+      scheduled.push(handle);
+      return handle;
+    },
+    clearTimeoutFn() {},
+  });
+
+  dispatcher.start();
+  assert.equal(claims, 0, 'the inert test timer must not poll on its own');
+  assert.equal(await dispatcher.kick(), true);
+  assert.equal(claims, 2, 'kick fills the lane and observes the empty queue boundary');
+  assert.equal(processed, 1);
+  assert.equal(scheduled.length >= 1, true);
+  await dispatcher.stop();
+});

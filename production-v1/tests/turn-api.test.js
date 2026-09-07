@@ -643,11 +643,11 @@ test('turn api renewal loss aborts provider work and session deletion cannot be 
   assert.equal(await store.getSessionByTokenHash('token-one'), null);
 });
 
-async function startSseApp(t, configOverrides = {}) {
+async function startSseApp(t, configOverrides = {}, appOverrides = {}) {
   const { store } = await createStore(t);
   const eventHub = new EventHub();
   const config = loadConfig({ NODE_ENV: 'test', V1_PUBLIC_ORIGIN: ORIGIN, V1_SESSION_SECRET: 'x'.repeat(32), ...configOverrides });
-  const app = createApp({ config, store, eventHub });
+  const app = createApp({ config, store, eventHub, ...appOverrides });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   t.after(async () => {
@@ -661,6 +661,44 @@ async function startSseApp(t, configOverrides = {}) {
   const cookie = createdResponse.headers.getSetCookie()[0].split(';')[0];
   return { baseUrl, cookie, store, eventHub, owner: { session: created.data.session, conversation: created.data.conversation } };
 }
+
+test('message acceptance awaits one immediate dispatcher kick before returning 202', async (t) => {
+  let releaseKick;
+  let markKickStarted;
+  const kickStarted = new Promise((resolve) => { markKickStarted = resolve; });
+  const kickGate = new Promise((resolve) => { releaseKick = resolve; });
+  let kickCalls = 0;
+  const runtime = await startSseApp(t, {}, {
+    dispatcher: {
+      kick: async () => {
+        kickCalls += 1;
+        markKickStarted();
+        await kickGate;
+        return true;
+      },
+      wake() {},
+    },
+  });
+  const responsePromise = fetch(`${runtime.baseUrl}/api/v1/messages`, {
+    method: 'POST',
+    headers: { Origin: ORIGIN, Cookie: runtime.cookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      clientMessageId: '78000000-0000-4000-8000-000000000000',
+      text: 'Dispatch this durable turn',
+      replyLanguage: 'en',
+      replyMode: 'text',
+    }),
+  });
+  await settleWithin(kickStarted, 500, 'dispatcher kick did not start');
+  let responseSettled = false;
+  void responsePromise.then(() => { responseSettled = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(responseSettled, false, 'the 202 response must wait for the durable claim attempt');
+  releaseKick();
+  const response = await responsePromise;
+  assert.equal(response.status, 202);
+  assert.equal(kickCalls, 1);
+});
 
 async function collectSse(response, predicate, timeoutMs = 1000) {
   const reader = response.body.getReader();

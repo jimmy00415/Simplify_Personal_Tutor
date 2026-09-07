@@ -197,6 +197,12 @@ export function createDispatcher({
     schedule(0);
   }
 
+  async function kick() {
+    if (!started || stopped || paused) return false;
+    await pump();
+    return lastPollOutcome === 'success';
+  }
+
   function stop() {
     if (stopPromise) return stopPromise;
     stopped = true;
@@ -231,5 +237,5 @@ export function createDispatcher({
     };
   }
 
-  return { workerId, runOnce, probe, start, pause, resume, wake, stop, readiness };
+  return { workerId, runOnce, probe, start, pause, resume, wake, kick, stop, readiness };
 }

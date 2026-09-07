@@ -223,6 +223,7 @@ export function createSessionRouter({
           sessionId: sessionData.session.id,
           ...(controlledTtsFailureHeader === 'provider-rejection-v1' ? { controlledTtsFailure: true } : {}),
         });
+        await dispatcher?.kick?.().catch(() => false);
       }
       response.status(202).json({ data: { idempotent: accepted.idempotent, message: publicMessage(accepted.message), turn: publicTurn(accepted.turn) }, error: null, requestId: response.locals.requestId });
       queueMicrotask(() => {

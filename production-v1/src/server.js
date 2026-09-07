@@ -616,6 +616,7 @@ export async function startServer({
     cleanupService.start();
     if (config.nodeEnv === 'production') {
       applyReadinessState(cachedReadiness);
+      if (await dispatcher.kick() !== true) throw productionNotReady();
       startWatchdog();
     }
     voiceRecovery = startVoiceRecovery();

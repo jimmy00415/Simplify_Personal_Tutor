@@ -199,6 +199,41 @@ test('production startup waits for first retention success and all live checks b
   assert.ok(order.indexOf('media:close') < order.indexOf('store:close'));
 });
 
+test('production startup performs one real dispatcher poll even when scheduled timers are inert', async (t) => {
+  const order = [];
+  const config = productionConfig();
+  const { store, mediaStore, cleanupService } = runtimeFixture(order);
+  const server = await startServer({
+    config,
+    host: '127.0.0.1',
+    port: 0,
+    store,
+    mediaStore,
+    cleanupService,
+    retentionWorker: {
+      firstRun: Promise.resolve({ ok: true }),
+      readiness: async () => ({ status: 'ready', healthy: true, policyVersion: 'retention-v1' }),
+      stop: async () => order.push('retention:stop'),
+    },
+    corpus: {
+      schemaVersion: 'hkbu-campus-v1',
+      snapshotAt: '2026-08-25T12:00:00+08:00',
+      sources: [{ id: 'official-source' }],
+    },
+    llmProvider: { provider: 'fake-real', generate: async () => ({ text: 'unused' }) },
+    evaluateReadiness: async () => safeReadiness(true),
+    dispatcherOptions: {
+      setTimeoutFn: (callback, delay) => ({ callback, delay, unref() {} }),
+      clearTimeoutFn: () => undefined,
+    },
+  });
+  t.after(() => server.shutdown());
+
+  assert.equal(server.listening, true);
+  assert.equal(order.filter((entry) => entry === 'dispatcher:claim').length, 1);
+  await server.shutdown();
+});
+
 test('a failed production readiness gate never opens HTTP and closes every initialized runtime dependency', async () => {
   const order = [];
   const config = productionConfig();
