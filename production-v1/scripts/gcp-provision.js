@@ -761,7 +761,7 @@ export function createGcloudExecutor({ executable, prefixArgs = [], execFile = e
     if (!Number.isSafeInteger(maxBuffer) || maxBuffer < 1 || maxBuffer > 32 * 1024 * 1024) {
       throw new Error('gcloud output limit is invalid');
     }
-    if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 120_000
+    if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600_000
       || (signal !== undefined && (
         !signal || typeof signal !== 'object' || typeof signal.aborted !== 'boolean'
       ))) throw new Error('gcloud invocation deadline is invalid');

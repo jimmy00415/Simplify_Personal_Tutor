@@ -9252,7 +9252,9 @@ export async function runGcpRelease({
       const payloadReadbackKey = member.id.startsWith('inventory-payload-readback:')
         || member.id.startsWith('evidence-payload-readback:')
         ? member.id.slice(member.id.indexOf(':') + 1) : null;
-      const operationOptions = publicationKey !== null ? Object.freeze({
+      const operationOptions = member.id === 'build-submit' ? Object.freeze({
+        timeout: 600_000,
+      }) : publicationKey !== null ? Object.freeze({
         stdin: evidencePublicationBytes(
           evidencePublicationPayloads, publicationKey, plan.evidence[publicationKey],
         ),

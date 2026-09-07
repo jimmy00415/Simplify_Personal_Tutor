@@ -810,8 +810,17 @@ test('gcloud execution is argv-only and rejects values that could disclose a sec
     options: { encoding: 'utf8', maxBuffer: 1048576, windowsHide: true, timeout: 120_000 },
   }]);
   assert.equal(calls[0].args.filter((value) => value === '--quiet').length, 1);
+  await executor(
+    ['builds', 'submit', '--format=json'],
+    { timeout: 600_000 },
+  );
+  assert.equal(calls[1].options.timeout, 600_000);
+  await assert.rejects(
+    () => executor(['builds', 'submit', '--format=json'], { timeout: 600_001 }),
+    /deadline/i,
+  );
   await executor(['projects', 'describe', PROJECT, `--project=${PROJECT}`, '--format=json', '--quiet']);
-  assert.equal(calls[1].args.filter((value) => value === '--quiet').length, 1);
+  assert.equal(calls[2].args.filter((value) => value === '--quiet').length, 1);
   await assert.rejects(
     () => executor(['projects', 'describe', PROJECT, '--quiet', '--quiet']),
     /non-interactive|quiet|argv/i,

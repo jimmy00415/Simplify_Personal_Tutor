@@ -4141,12 +4141,14 @@ test('build receipt captures one successful verified build, source hash, and fin
   }), /build receipt/i);
 
   const calls = [];
+  const callOptions = [];
   let configChecks = 0;
   return runGcpRelease({
     argv: ['--phase=build', `--confirm-release=${RELEASE_SHA}`],
     input: releaseInput(),
-    execute: async (argv) => {
+    execute: async (argv, options) => {
       calls.push(argv);
+      callOptions.push(options);
       return structuredClone(build);
     },
     verifySourceArchive: async () => true,
@@ -4156,6 +4158,8 @@ test('build receipt captures one successful verified build, source hash, and fin
     assert.equal(result.exitCode, 0, JSON.stringify(result.publicReport));
     assert.deepEqual(result.publicReport.buildReceipt, receipt);
     assert.equal(configChecks, 2);
+    assert.deepEqual(callOptions[0], { timeout: 600_000 });
+    assert.equal(callOptions[1], undefined);
     assert.deepEqual(calls[1], [
       'builds', 'describe', BUILD_ID,
       `--project=${PROJECT}`, `--region=${REGION}`, '--format=json',
