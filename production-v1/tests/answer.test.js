@@ -319,6 +319,23 @@ test('answer service is honestly unverified and never invents a global directory
   assert.deepEqual(answer.cards, []);
 });
 
+test('answer service abstains from exact live canteen queue claims without static citations', async () => {
+  let providerCalls = 0;
+  const provider = { provider: 'hkbu', async generate() { providerCalls += 1; throw new Error('must not be called'); } };
+  const service = createAnswerService({ corpus, retriever, llmProvider: provider, now: () => FIXED_NOW });
+  const answer = await service.answer({
+    turnId: 'turn-live-canteen-queue',
+    text: 'What is the exact queue length at every canteen right now?',
+    context: [],
+  });
+
+  assert.equal(providerCalls, 0);
+  assert.equal(answer.groundingStatus, 'unverified');
+  assert.equal(answer.needsClarification, true);
+  assert.deepEqual(answer.citations, []);
+  assert.match(answer.text, /could not confirm|未能確認|未能确认/i);
+});
+
 test('answer service safety bypass is deterministic, multilingual, and never calls the model', async () => {
   let providerCalls = 0;
   const provider = { provider: 'hkbu', async generate() { providerCalls += 1; throw new Error('must not be called'); } };

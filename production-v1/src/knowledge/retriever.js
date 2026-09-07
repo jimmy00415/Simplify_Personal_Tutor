@@ -47,6 +47,11 @@ const DINING_OPEN_SET_ALIASES = [
   'what else', 'where else', 'anything else', 'other than', 'besides',
   '其他', '其它', '仲有', '還有', '还有', '有咩食', '有什么吃', '邊間', '边间', '哪間', '哪间',
 ];
+const LIVE_DINING_TELEMETRY_ALIASES = [
+  'queue', 'queue length', 'wait time', 'waiting time', 'how crowded', 'crowded',
+  'occupancy', 'available seat', 'available seats', 'number of people',
+  '排隊', '排队', '等候時間', '等待时间', '人流', '擠唔擠', '挤不挤', '多人', '多少人', '有位', '有座位',
+];
 const TRANSPORT_DIRECTION_ALIASES = [
   'how do i get', 'how to get', 'get from', 'route from', 'route to',
   '點去', '点去', '點樣去', '点样去', '怎麼去', '怎么去', '如何去',
@@ -322,6 +327,11 @@ function ambiguityFor(query, ranked, selectedClaims) {
     .map(({ claim }) => claim)
     .filter((claim) => claim.verificationStatus === 'official_verified');
 
+  const asksLiveDiningTelemetry = ranked.some(({ source }) => (
+    source.intentGroups.includes('dining') || source.intentGroups.includes('dining_inventory')
+  )) && hasAny(query, LIVE_DINING_TELEMETRY_ALIASES);
+  if (asksLiveDiningTelemetry) codes.push('LIVE_DINING_STATUS_UNAVAILABLE');
+
   const hasLibrary = ranked.some(({ source }) => source.intentGroups.includes('library'));
   const libraryBranches = new Set(
     relevantOfficialClaims.map((claim) => claim.facts?.branch).filter(Boolean),
@@ -396,6 +406,7 @@ function ambiguityFor(query, ranked, selectedClaims) {
 }
 
 function isBlockedByClarification(claim, ambiguityCodes, query) {
+  if (ambiguityCodes.includes('LIVE_DINING_STATUS_UNAVAILABLE')) return true;
   if (claim.sourceId === 'hkbu.ar.student-card-collection'
     && ambiguityCodes.some((code) => code.startsWith('STUDENT_CARD_'))) return true;
   if (claim.facts?.branch && ambiguityCodes.includes('LIBRARY_BRANCH_REQUIRED')) return true;

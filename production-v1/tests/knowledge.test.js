@@ -488,6 +488,15 @@ test('knowledge retrieval asks for branch, cohort, or current special-hours deta
   assert.ok(catering.ambiguityCodes.includes('CATERING_SPECIAL_HOURS_REQUIRED'));
 });
 
+test('knowledge retrieval does not promote static dining guidance as live queue telemetry', () => {
+  const result = retrieve('What is the exact queue length at every canteen right now?');
+
+  assert.equal(result.needsClarification, true);
+  assert.ok(result.ambiguityCodes.includes('LIVE_DINING_STATUS_UNAVAILABLE'));
+  assert.deepEqual(result.supportableClaims, []);
+  assert.deepEqual(result.evidenceIds, []);
+});
+
 test('knowledge retrieval gates sources, claims, and clarification by the matched route', () => {
   const village = retrieve('Village CARE non-local freshman check-in 2026');
   assert.deepEqual(village.sources.map((source) => source.id), ['hkbu.sa.village-care-check-in']);
