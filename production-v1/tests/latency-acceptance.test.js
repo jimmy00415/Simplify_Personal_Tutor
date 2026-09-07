@@ -17,6 +17,7 @@ import {
   nearestRankP50,
   nearestRankP95,
   runLatencyAcceptance,
+  safeRequest,
 } from '../scripts/production-latency-workload.js';
 import { acceptanceTimingQueryDigest } from '../src/telemetry/acceptance-timings.js';
 
@@ -103,6 +104,29 @@ function observeSettlement(promise) {
   );
   return observation;
 }
+
+test('safe workload requests retry one transient failure only for idempotent operations', async () => {
+  for (const operation of ['asr', 'tts', 'timings', 'verifyCandidate']) {
+    let attempts = 0;
+    const result = await safeRequest(async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('transient network failure');
+      return { ok: true, operation };
+    }, { operation }, { requestDeadlineMs: 1_000 });
+    assert.deepEqual(result, { ok: true, operation });
+    assert.equal(attempts, 2);
+  }
+
+  for (const operation of ['bootstrap', 'text']) {
+    let attempts = 0;
+    const result = await safeRequest(async () => {
+      attempts += 1;
+      throw new Error('ambiguous mutation outcome');
+    }, { operation }, { requestDeadlineMs: 1_000 });
+    assert.equal(result, null);
+    assert.equal(attempts, 1);
+  }
+});
 
 function createHarness({
   environment = {

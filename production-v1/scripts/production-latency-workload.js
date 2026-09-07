@@ -570,13 +570,26 @@ function normalizeTtsResult(value, expected = {}) {
   };
 }
 
-async function safeRequest(requester, input, {
+const RETRY_SAFE_OPERATIONS = new Set(['asr', 'timings', 'tts', 'verifyCandidate']);
+
+export async function safeRequest(requester, input, {
   parentSignal = null,
   requestDeadlineMs = DEFAULT_REQUEST_DEADLINE_MS,
 } = {}) {
   try {
     const result = await withDeadline(
-      (signal) => requester(input, { signal }),
+      async (signal) => {
+        const maximumAttempts = RETRY_SAFE_OPERATIONS.has(input?.operation) ? 2 : 1;
+        for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+          try {
+            return await requester(input, { signal });
+          } catch (error) {
+            if (signal.aborted) throw deadlineReason(signal, 'LATENCY_REQUEST_DEADLINE_EXCEEDED');
+            if (attempt === maximumAttempts) throw error;
+          }
+        }
+        return null;
+      },
       {
         timeoutMs: requestDeadlineMs,
         code: 'LATENCY_REQUEST_DEADLINE_EXCEEDED',
