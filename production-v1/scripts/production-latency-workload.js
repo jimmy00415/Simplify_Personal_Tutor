@@ -35,6 +35,8 @@ const DEFAULT_FETCH_DEADLINE_MS = 30_000;
 const DEFAULT_POLL_DEADLINE_MS = 30_000;
 const DEFAULT_REQUEST_DEADLINE_MS = 45_000;
 const DEFAULT_COMMAND_DEADLINE_MS = 20 * 60_000;
+const CONTROL_PLANE_RECEIPT_ATTEMPTS = 13;
+const CONTROL_PLANE_RECEIPT_DELAY_MS = 5_000;
 const MAX_DEADLINE_MS = 60 * 60_000;
 const MAX_RESPONSE_BODY_BYTES = 1024 * 1024;
 const MAX_MEDIA_BODY_BYTES = 4 * 1024 * 1024;
@@ -1420,6 +1422,7 @@ export async function runLatencyAcceptance({
   loadAsrFixtures = defaultLoadAsrFixtures,
   mintIdentityToken = mintGcloudIdentityToken,
   readControlPlaneReceipts = readGcloudControlPlaneReceipts,
+  controlPlaneReceiptSleep = defaultPollSleep,
   requester = null,
   fetchImpl = globalThis.fetch,
   randomUUID = systemRandomUUID,
@@ -1474,6 +1477,7 @@ export async function runLatencyAcceptance({
   commandDeadlineMs = deadlineValue(commandDeadlineMs, DEFAULT_COMMAND_DEADLINE_MS);
   if (typeof cwd !== 'string' || !isAbsolute(cwd)
     || typeof artifactDirectory !== 'string' || !isAbsolute(artifactDirectory)
+    || typeof controlPlaneReceiptSleep !== 'function'
     || operationDeadlineMs === null || fetchDeadlineMs === null
     || pollDeadlineMs === null || requestDeadlineMs === null || commandDeadlineMs === null) {
     return publish(writeOutput, 2, { status: 'not-run', code: 'COMMAND_CONTEXT_INVALID' });
@@ -1724,19 +1728,27 @@ export async function runLatencyAcceptance({
   const expectedTraceIds = textOperational.map(({ traceId }) => traceId);
   let controlPlaneRequests;
   try {
-    const rawControlPlane = await commandOperation((signal) => readControlPlaneReceipts({
-      acceptanceWindowId,
-      candidateOrigin,
-      candidateRevision,
-      occurredAt,
-      expectedTraceIds,
-    }, { signal }));
-    controlPlaneRequests = normalizeControlPlaneTurnReceipts(rawControlPlane, {
-      acceptanceWindowId,
-      candidateOrigin,
-      candidateRevision,
-      expectedTraceIds,
-    });
+    for (let attempt = 0; attempt < CONTROL_PLANE_RECEIPT_ATTEMPTS; attempt += 1) {
+      const rawControlPlane = await commandOperation((signal) => readControlPlaneReceipts({
+        acceptanceWindowId,
+        candidateOrigin,
+        candidateRevision,
+        occurredAt,
+        expectedTraceIds,
+      }, { signal }));
+      controlPlaneRequests = normalizeControlPlaneTurnReceipts(rawControlPlane, {
+        acceptanceWindowId,
+        candidateOrigin,
+        candidateRevision,
+        expectedTraceIds,
+      });
+      if (controlPlaneRequests || !Array.isArray(rawControlPlane)
+        || rawControlPlane.length >= 200
+        || attempt === CONTROL_PLANE_RECEIPT_ATTEMPTS - 1) break;
+      await commandOperation((signal) => controlPlaneReceiptSleep(
+        CONTROL_PLANE_RECEIPT_DELAY_MS, { signal },
+      ));
+    }
   } catch {
     controlPlaneRequests = null;
   }

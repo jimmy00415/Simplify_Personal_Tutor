@@ -428,6 +428,42 @@ test('Cloud Logging read uses the same real Windows bundled-Python launcher with
   assert.equal(JSON.stringify(calls).includes(TEST_ID_TOKEN), false);
 });
 
+test('workload waits for eventual Cloud Logging visibility before rejecting receipts', async () => {
+  const harness = createHarness();
+  let reads = 0;
+  const waits = [];
+  const result = await harness.run({
+    readControlPlaneReceipts: async (query) => {
+      reads += 1;
+      const count = reads === 1 ? 199 : 200;
+      return Array.from({ length: count }, (_, index) => ({
+        insertId: `request-${String(index + 1).padStart(3, '0')}`,
+        timestamp: new Date(NOW.getTime() + index).toISOString(),
+        trace: `projects/motion-expert-hk-ltd-webpage/traces/${query.expectedTraceIds[index]}`,
+        resource: {
+          type: 'cloud_run_revision',
+          labels: {
+            project_id: 'motion-expert-hk-ltd-webpage', location: 'asia-east2',
+            service_name: CANDIDATE_SERVICE, revision_name: CANDIDATE_REVISION,
+          },
+        },
+        httpRequest: {
+          requestMethod: 'POST', requestUrl: `${ORIGIN}/api/v1/messages`,
+          status: 202, latency: '0.200s',
+          userAgent: `hkbuddy-v1-acceptance/${query.acceptanceWindowId}`,
+        },
+      }));
+    },
+    controlPlaneReceiptSleep: async (milliseconds, { signal } = {}) => {
+      waits.push({ milliseconds, aborted: signal?.aborted ?? false });
+    },
+  });
+
+  assert.equal(result.exitCode, 0, JSON.stringify(result.publicReport));
+  assert.equal(reads, 2);
+  assert.deepEqual(waits, [{ milliseconds: 5_000, aborted: false }]);
+});
+
 test('command is inert unless exact arguments, explicit load confirmation, frozen SHA, and safe candidate are present', async (t) => {
   const cases = [
     ['missing arguments', { argv: [] }, 'LATENCY_ARGUMENTS_REQUIRED'],
