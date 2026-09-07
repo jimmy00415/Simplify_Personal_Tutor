@@ -8327,8 +8327,11 @@ export async function runGcpRelease({
           gateStartedAt: workloadReceiptExecution.gateStartedAt,
           gateEndedAt: workloadReceiptExecution.gateEndedAt,
         };
+      const validationClock = reconstructCheckpointedPhase && selection.phase === phase
+        ? new Date(openJournalRecords.at(-1)?.createdAt)
+        : now();
       const verified = await verifyTask8Evidence(plan.task8Evidence[phase], phase, plan, {
-        now: now(), gateWindow, historical: selection.phase !== phase,
+        now: validationClock, gateWindow, historical: selection.phase !== phase,
       });
       if (verified !== true && !(phase === 'workload' && verified
         && typeof verified === 'object' && !Array.isArray(verified))) {

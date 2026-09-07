@@ -24,6 +24,7 @@ const COMMIT = '1'.repeat(40);
 const PROJECT_NUMBER = '582852715831';
 const STABLE_SERVICE = 'hkbuddy-v1-api';
 const CANDIDATE_SERVICE = 'hkbuddy-v1-api-candidate';
+const ACCEPTANCE_PRINCIPAL = 'hkbuddy-v1-acceptance@motion-expert-hk-ltd-webpage.iam.gserviceaccount.com';
 const STABLE_ORIGIN = `https://hkbuddy-v1-api-${PROJECT_NUMBER}.asia-east2.run.app`;
 const ORIGIN = `https://candidate-${COMMIT.slice(0, 12)}---hkbuddy-v1-api-candidate-${PROJECT_NUMBER}.asia-east2.run.app`;
 const CANDIDATE_ROOT = `https://${CANDIDATE_SERVICE}-${PROJECT_NUMBER}.asia-east2.run.app`;
@@ -39,7 +40,7 @@ const TEST_ID_TOKEN = [
     iss: 'https://accounts.google.com',
     aud: CANDIDATE_ROOT,
     sub: '1234567890',
-    email: 'admin@motionexp.com',
+    email: ACCEPTANCE_PRINCIPAL,
     iat: Math.floor(NOW.getTime() / 1000) - 30,
     exp: Math.floor(NOW.getTime() / 1000) + 3_600,
   })).toString('base64url'),
@@ -343,30 +344,34 @@ test('nearest-rank percentiles are deterministic and the acceptance contract fix
   });
 });
 
-test('private candidate authentication mints the exact audience-bound gcloud ID token in memory', async () => {
+test('private candidate authentication mints an audience-bound acceptance-service-account ID token in memory', async () => {
   const calls = [];
-  const token = await mintGcloudIdentityToken({
-    audience: CANDIDATE_ROOT,
-    environment: {
-      V1_GCP_PYTHON_EXECUTABLE: 'C:\\Program Files (x86)\\Google\\Cloud SDK\\google-cloud-sdk\\platform\\bundledpython\\python.exe',
-      V1_GCLOUD_PY_PATH: 'C:\\Program Files (x86)\\Google\\Cloud SDK\\google-cloud-sdk\\lib\\gcloud.py',
-    },
-    executeFile: async (file, argv, options) => {
-      calls.push({ file, argv, options });
-      return { stdout: `${TEST_ID_TOKEN}\n`, stderr: '' };
+  const request = Object.assign(async (input) => {
+    calls.push({ kind: 'request', input });
+    return { token: TEST_ID_TOKEN };
+  }, {
+    getPrincipal: async (signal) => {
+      calls.push({ kind: 'principal', signal });
+      return 'admin@motionexp.com';
     },
   });
+  const token = await mintGcloudIdentityToken({
+    audience: CANDIDATE_ROOT,
+    request,
+  });
   assert.equal(token, TEST_ID_TOKEN);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].file,
-    'C:\\Program Files (x86)\\Google\\Cloud SDK\\google-cloud-sdk\\platform\\bundledpython\\python.exe');
-  assert.deepEqual(calls[0].argv, [
-    'C:\\Program Files (x86)\\Google\\Cloud SDK\\google-cloud-sdk\\lib\\gcloud.py',
-    'auth', 'print-identity-token', `--audiences=${CANDIDATE_ROOT}`,
-    '--account=admin@motionexp.com', '--quiet',
+  assert.deepEqual(calls, [
+    { kind: 'principal', signal: undefined },
+    {
+      kind: 'request',
+      input: {
+        method: 'POST',
+        url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(ACCEPTANCE_PRINCIPAL)}:generateIdToken`,
+        body: { audience: CANDIDATE_ROOT, includeEmail: true },
+        signal: undefined,
+      },
+    },
   ]);
-  assert.equal(calls[0].options.windowsHide, true);
-  assert.equal(calls[0].options.shell, false);
   assert.equal(JSON.stringify(calls).includes(TEST_ID_TOKEN), false);
 });
 
@@ -577,7 +582,7 @@ test('passing run executes the exact workload at concurrency five and writes one
     authenticated: true,
     audience: CANDIDATE_ROOT,
     issuer: 'https://accounts.google.com',
-    subjectSha256: createHash('sha256').update('admin@motionexp.com').digest('hex'),
+    subjectSha256: createHash('sha256').update(ACCEPTANCE_PRINCIPAL).digest('hex'),
     taggedUrl: ORIGIN,
   });
   assert.equal(JSON.stringify(record).includes(TEST_ID_TOKEN), false);

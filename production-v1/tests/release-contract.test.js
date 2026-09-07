@@ -9273,6 +9273,71 @@ test('readiness receipt is created only from one controlled fresh producer run',
   assert.equal(producerCalls, 1);
 });
 
+test('checkpointed readiness recovery validates at the durable checkpoint instant', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'hkbuddy-readiness-checkpoint-clock-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const base = releaseInput();
+  const unresolved = {
+    ...base.task8Evidence.readiness,
+    filePath: join(directory, 'readiness.json'),
+    artifactSha256: '0'.repeat(64),
+    objectSha256: '0'.repeat(64),
+    privacyProofs: Object.fromEntries(['start', 'end'].map((boundary) => [boundary, {
+      ...base.task8Evidence.readiness.privacyProofs[boundary],
+      filePath: join(directory, `privacy-${boundary}.json`),
+      artifactSha256: '0'.repeat(64),
+      objectSha256: '0'.repeat(64),
+      boundarySha256: '0'.repeat(64),
+    }])),
+  };
+  const input = releaseInput({
+    task8Evidence: { ...base.task8Evidence, readiness: unresolved },
+  });
+  const initialPlan = buildReleasePlan(input, { phase: 'readiness' });
+  const records = [];
+  const first = await runGcpRelease({
+    argv: ['--phase=readiness', `--confirm-release=${RELEASE_SHA}`],
+    input,
+    loadReceipts: async (plan, { through }) => fixtureReceiptChain(plan, through),
+    executeReadiness: async () => controlledReadinessExecution(initialPlan),
+    readinessTokenExecutor: async () => 'unused',
+    openStateStore: async () => createTestStateStore({ records }),
+    verifyTask8Evidence: async () => true,
+    execute: async () => { throw new Error('controlled readiness fixture must not call gcloud'); },
+    persistReceipt: async () => { throw new Error('simulated receipt write loss'); },
+    now: () => new Date('2026-08-27T08:02:00.000Z'),
+    writeOutput: () => undefined,
+  });
+  assert.equal(first.exitCode, 1);
+  assert.deepEqual(records.map(({ recordType }) => recordType), ['intent', 'checkpoint']);
+  records.at(-1).createdAt = '2026-08-27T08:02:00.000Z';
+
+  let verification = null;
+  const resumed = await runGcpRelease({
+    argv: ['--phase=readiness', `--confirm-release=${RELEASE_SHA}`],
+    input,
+    loadReceipts: async (plan, { through }) => fixtureReceiptChain(plan, through),
+    executeReadiness: async () => { throw new Error('checkpoint recovery must not rerun readiness'); },
+    readinessTokenExecutor: async () => 'unused',
+    openStateStore: async () => createTestStateStore({ records }),
+    verifyTask8Evidence: async (_entry, phase, _plan, options) => {
+      verification = { phase, historical: options.historical, now: options.now.toISOString() };
+      return options.now.toISOString() === records.at(-1).createdAt;
+    },
+    execute: async () => { throw new Error('checkpoint recovery must remain inert'); },
+    persistReceipt: async () => true,
+    now: () => new Date('2026-08-27T08:10:00.000Z'),
+    writeOutput: () => undefined,
+  });
+  assert.equal(resumed.exitCode, 0, JSON.stringify(resumed.publicReport));
+  assert.deepEqual(verification, {
+    phase: 'readiness', historical: false, now: '2026-08-27T08:02:00.000Z',
+  });
+  assert.deepEqual(records.map(({ recordType }) => recordType), [
+    'intent', 'checkpoint', 'terminal',
+  ]);
+});
+
 test('readiness publication journals exact bytes before every write and adopts all crash boundaries', async (t) => {
   for (const crashAfter of [1, 2, 3]) {
     await t.test(`crash after artifact ${crashAfter}`, async (st) => {

@@ -10,7 +10,10 @@ import { validateCanonicalWav } from '../src/media/canonical-wav.js';
 import { GCP_IDENTITY } from '../src/gcp-identity.js';
 export { decodeCanonicalMp3, validateCanonicalMp3 } from '../src/media/canonical-mp3.js';
 import { decodeCanonicalMp3 } from '../src/media/canonical-mp3.js';
-import { createDefaultGcloudTextExecutor } from './gcp-provision.js';
+import {
+  createDefaultGcloudAuthenticatedRequest,
+  createDefaultGcloudTextExecutor,
+} from './gcp-provision.js';
 
 const execFileAsync = promisify(execFile);
 const PROJECT = GCP_IDENTITY.projectId;
@@ -19,6 +22,7 @@ const REGION = GCP_IDENTITY.region;
 const STABLE_SERVICE = GCP_IDENTITY.service;
 const CANDIDATE_SERVICE = GCP_IDENTITY.candidateService;
 const QA_PRINCIPAL = 'admin@motionexp.com';
+const ACCEPTANCE_PRINCIPAL = GCP_IDENTITY.serviceAccounts.acceptance;
 const RELEASE_SHA = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const IMAGE_DIGEST = /^sha256:[0-9a-f]{64}$/;
@@ -189,7 +193,7 @@ function authenticatedAccess(token, { audience, taggedUrl, now }) {
   const issuer = payload?.iss;
   if (!payload || !Number.isFinite(nowSeconds)
     || !['accounts.google.com', 'https://accounts.google.com'].includes(issuer)
-    || payload.aud !== audience || payload.email !== QA_PRINCIPAL
+    || payload.aud !== audience || payload.email !== ACCEPTANCE_PRINCIPAL
     || typeof payload.sub !== 'string' || payload.sub.length < 1 || payload.sub.length > 256
     || payload.email_verified === false
     || !Number.isSafeInteger(payload.iat) || !Number.isSafeInteger(payload.exp)
@@ -204,16 +208,29 @@ function authenticatedAccess(token, { audience, taggedUrl, now }) {
 }
 
 export async function mintGcloudIdentityToken({
-  audience, signal, executeFile = execFileAsync, environment = process.env,
+  audience, signal, environment = process.env, request,
 } = {}) {
   if (typeof audience !== 'string' || !audience.startsWith('https://') || signal?.aborted) {
     throw new Error('identity token request is invalid');
   }
-  const executeGcloud = createDefaultGcloudTextExecutor({ environment, execFile: executeFile });
-  const stdout = await executeGcloud([
-    'auth', 'print-identity-token', `--audiences=${audience}`, `--account=${QA_PRINCIPAL}`, '--quiet',
-  ], { maxBuffer: 32 * 1024, signal });
-  const token = stdout.trim();
+  const authenticatedRequest = request ?? createDefaultGcloudAuthenticatedRequest({
+    environment,
+    account: QA_PRINCIPAL,
+  });
+  if (typeof authenticatedRequest !== 'function'
+    || typeof authenticatedRequest.getPrincipal !== 'function'
+    || await authenticatedRequest.getPrincipal(signal) !== QA_PRINCIPAL) {
+    throw new Error('identity token request principal is invalid');
+  }
+  const response = await authenticatedRequest({
+    method: 'POST',
+    url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(ACCEPTANCE_PRINCIPAL)}:generateIdToken`,
+    body: { audience, includeEmail: true },
+    signal,
+  });
+  if (!response || typeof response !== 'object' || Array.isArray(response)
+    || Object.keys(response).length !== 1) throw new Error('identity token response is invalid');
+  const token = response.token;
   if (!token || /[\r\n\s]/.test(token)) throw new Error('identity token response is invalid');
   return token;
 }
