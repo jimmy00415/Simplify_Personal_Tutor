@@ -1322,6 +1322,8 @@ test('privacy proof validates a delayed token against its mint-time clock', asyn
     sleep: harness.sleep,
   });
   assert.equal(proof.result, 'pass');
+  assert.equal(proof.occurredAt, new Date(start + 45_000).toISOString());
+  assert.equal(proof.expiresAt, new Date(start + 345_000).toISOString());
 });
 
 test('controlled privacy producer proves inherited IAM, both edges, and exact logs without persisting credentials', async () => {

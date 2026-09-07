@@ -1657,12 +1657,12 @@ export async function runCandidatePrivacyProof({
     if (!(completedAt instanceof Date) || !Number.isFinite(completedAt.getTime())
       || completedAt.getTime() >= observedAt.getTime() + MAXIMUM_AGE_MS) fail();
 
-    const occurredAt = observedAt.toISOString();
+    const occurredAt = completedAt.toISOString();
     const proof = finalizeCandidatePrivacyProof({
       schemaVersion: SCHEMA_VERSION,
       proofType: 'candidate-effective-privacy',
       occurredAt,
-      expiresAt: new Date(observedAt.getTime() + MAXIMUM_AGE_MS).toISOString(),
+      expiresAt: new Date(completedAt.getTime() + MAXIMUM_AGE_MS).toISOString(),
       result: 'pass',
       binding: proofBinding(binding),
       controlPlane: {
