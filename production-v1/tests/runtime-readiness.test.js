@@ -294,3 +294,43 @@ test('dispatcher kick performs an immediate durable poll without waiting for its
   assert.equal(scheduled.length >= 1, true);
   await dispatcher.stop();
 });
+
+test('dispatcher recovers after a kick races a full worker pool', async () => {
+  const turns = [{ id: 'turn-one' }, { id: 'turn-two' }];
+  const processed = [];
+  const scheduled = [];
+  let releaseFirst;
+  const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+  const dispatcher = createDispatcher({
+    store: {
+      dispatcherHealthCheck: async () => ({ ok: true, driver: 'postgres', capability: 'turn-claim' }),
+      claimNextTurn: async () => turns.shift() ?? null,
+      renewTurnLease: async () => true,
+    },
+    processTurn: async ({ turn }) => {
+      processed.push(turn.id);
+      if (turn.id === 'turn-one') await firstGate;
+    },
+    concurrency: 1,
+    pollIntervalMs: 60_000,
+    setTimeoutFn(callback, delay) {
+      const handle = { callback, delay, unref() {} };
+      scheduled.push(handle);
+      return handle;
+    },
+    clearTimeoutFn() {},
+  });
+
+  dispatcher.start();
+  assert.equal(await dispatcher.kick(), true);
+  assert.deepEqual(processed, ['turn-one']);
+  assert.equal(await dispatcher.kick(), true, 'a full-pool kick must not poison future polling');
+
+  releaseFirst();
+  await new Promise((resolve) => setImmediate(resolve));
+  scheduled[0].callback();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(processed, ['turn-one', 'turn-two']);
+  await dispatcher.stop();
+});

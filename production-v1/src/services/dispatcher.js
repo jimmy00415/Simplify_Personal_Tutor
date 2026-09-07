@@ -154,7 +154,7 @@ export function createDispatcher({
 
   async function pump() {
     if (pumpPromise) return pumpPromise;
-    pumpPromise = (async () => {
+    const work = (async () => {
       try {
         while (started && !stopped && !paused && activeJobs.size < concurrency) {
           const claimed = await claimAndLaunch();
@@ -162,12 +162,15 @@ export function createDispatcher({
         }
       } catch {
         // Durable polling retries on the next interval; request/provider data is never logged here.
-      } finally {
-        pumpPromise = null;
-        if (started && !stopped && !paused && activeJobs.size < concurrency) schedule();
       }
     })();
-    return pumpPromise;
+    pumpPromise = work;
+    try {
+      await work;
+    } finally {
+      if (pumpPromise === work) pumpPromise = null;
+      if (started && !stopped && !paused && activeJobs.size < concurrency) schedule();
+    }
   }
 
   function start({ paused: initiallyPaused = false } = {}) {
