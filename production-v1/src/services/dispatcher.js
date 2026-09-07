@@ -18,6 +18,9 @@ export function createDispatcher({
   renewalIntervalMs = 5_000,
   concurrency = dispatcherLimits.concurrency,
   pollStaleAfterMs = Math.max(pollIntervalMs * 4, 5_000),
+  setTimeoutFn = setTimeout,
+  clearTimeoutFn = clearTimeout,
+  unrefPollTimer = true,
 } = {}) {
   if (!store || typeof processTurn !== 'function') throw new Error('dispatcher dependencies are required');
   if (renewalIntervalMs >= leaseDurationMs) throw new Error('renewal interval must be shorter than lease duration');
@@ -25,6 +28,10 @@ export function createDispatcher({
   if (!Number.isInteger(pollStaleAfterMs) || pollStaleAfterMs <= 0) {
     throw new Error('dispatcher poll staleness must be a positive integer');
   }
+  if (typeof setTimeoutFn !== 'function' || typeof clearTimeoutFn !== 'function') {
+    throw new Error('dispatcher timer dependencies are required');
+  }
+  if (typeof unrefPollTimer !== 'boolean') throw new Error('dispatcher timer policy is invalid');
   let started = false;
   let stopped = false;
   let paused = false;
@@ -138,11 +145,11 @@ export function createDispatcher({
 
   function schedule(delay = pollIntervalMs) {
     if (!started || stopped || paused || timer) return;
-    timer = setTimeout(() => {
+    timer = setTimeoutFn(() => {
       timer = null;
       void pump();
     }, delay);
-    timer.unref?.();
+    if (unrefPollTimer) timer?.unref?.();
   }
 
   async function pump() {
@@ -179,13 +186,13 @@ export function createDispatcher({
   function pause() {
     if (!started || stopped || paused) return;
     paused = true;
-    if (timer) clearTimeout(timer);
+    if (timer) clearTimeoutFn(timer);
     timer = null;
   }
 
   function wake() {
     if (!started || stopped || paused) return;
-    if (timer) clearTimeout(timer);
+    if (timer) clearTimeoutFn(timer);
     timer = null;
     schedule(0);
   }
@@ -195,7 +202,7 @@ export function createDispatcher({
     stopped = true;
     started = false;
     paused = false;
-    if (timer) clearTimeout(timer);
+    if (timer) clearTimeoutFn(timer);
     timer = null;
     for (const controller of activeControllers) controller.abort();
     stopPromise = (async () => {

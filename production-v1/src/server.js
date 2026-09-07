@@ -647,7 +647,7 @@ export async function startServer({
 
 if (process.argv[1] && import.meta.url === new URL(`file:${process.argv[1]}`).href) {
   try {
-    const server = await startServer();
+    const server = await startServer({ dispatcherOptions: { unrefPollTimer: false } });
     installProcessShutdown({ server });
   } catch {
     process.stderr.write('Production V1 failed to start. Check safe configuration and dependency health.\n');

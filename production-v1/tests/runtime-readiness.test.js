@@ -227,3 +227,38 @@ test('dispatcher pause is recoverable and fences polling until resume', async ()
   assert.equal(claims > beforePause, true);
   await dispatcher.stop();
 });
+
+test('dispatcher keeps its poll timer referenced for an always-on production worker', async () => {
+  const scheduled = [];
+  const cleared = [];
+  const dispatcher = createDispatcher({
+    store: {
+      dispatcherHealthCheck: async () => ({ ok: true, driver: 'postgres', capability: 'turn-claim' }),
+      claimNextTurn: async () => null,
+      renewTurnLease: async () => true,
+    },
+    processTurn: async () => undefined,
+    pollIntervalMs: 60_000,
+    unrefPollTimer: false,
+    setTimeoutFn(callback, delay) {
+      const handle = {
+        callback,
+        delay,
+        unrefCalled: false,
+        unref() { this.unrefCalled = true; },
+      };
+      scheduled.push(handle);
+      return handle;
+    },
+    clearTimeoutFn(handle) { cleared.push(handle); },
+  });
+
+  dispatcher.start();
+  assert.equal(scheduled.length, 1);
+  assert.equal(scheduled[0].delay, 0);
+  assert.equal(scheduled[0].unrefCalled, false,
+    'the durable worker timer must keep the Node process lifecycle referenced');
+
+  await dispatcher.stop();
+  assert.deepEqual(cleared, [scheduled[0]]);
+});
