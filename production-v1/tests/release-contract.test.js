@@ -616,10 +616,11 @@ function validWorkloadAcceptanceRecord() {
       bindingId,
       durationMs: durationBucketSeconds * 1_000,
       durationBucketSeconds,
-      requestStatus: 202,
+      // Exercise both immediate completion and asynchronous polling receipts.
+      requestStatus: [202, 201, 200][index % 3],
       requestId: uuid(7, index + 1),
-      responseStatus: 200,
-      responseRequestId: uuid(8, index + 1),
+      responseStatus: index % 3 === 1 ? 201 : 200,
+      responseRequestId: index % 3 === 0 ? uuid(8, index + 1) : uuid(7, index + 1),
     };
   });
   const voiceSources = [

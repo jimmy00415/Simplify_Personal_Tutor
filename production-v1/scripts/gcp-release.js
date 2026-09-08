@@ -3690,8 +3690,11 @@ function validateRawLatencyReceipts(record, plan) {
       || item.sessionIndex !== index % 20 || item.ready !== true
       || item.bindingId !== item.clientUploadId || !UUID.test(String(item.clientUploadId ?? ''))
       || !UUID.test(String(item.correlationId ?? '')) || !UUID.test(String(item.requestId ?? ''))
-      || !UUID.test(String(item.responseRequestId ?? '')) || item.requestStatus !== 202
-      || item.responseStatus !== 200 || !DIGEST.test(String(item.fixtureSha256 ?? ''))
+      || !UUID.test(String(item.responseRequestId ?? ''))
+      || !(item.requestStatus === 202 ? item.responseStatus === 200
+        : [200, 201].includes(item.requestStatus)
+          && item.responseStatus === item.requestStatus && item.responseRequestId === item.requestId)
+      || !DIGEST.test(String(item.fixtureSha256 ?? ''))
       || typeof item.fixtureId !== 'string' || item.fixtureId.length < 1
       || !Object.hasOwn(languageWire, item.language) || item.wireLanguage !== languageWire[item.language]
       || ![10, 30, 55].includes(item.durationBucketSeconds)
