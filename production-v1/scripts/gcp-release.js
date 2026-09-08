@@ -7315,7 +7315,7 @@ function controlledWorkloadFromPublication(plan, publication, {
   ])) throw new Error('Workload publication intent is invalid');
   for (const [boundary, proof, artifact, clock] of [
     ['start', privacyStart, byRole['privacy-start'], execution.gateStartedAt],
-    ['end', privacyEnd, byRole['privacy-end'], execution.gateEndedAt],
+    ['end', privacyEnd, byRole['privacy-end'], privacyEnd.occurredAt],
   ]) {
     const reference = evidence.privacyProofs?.[boundary];
     if (!exact(assertPrivacyProofReference(reference), {
