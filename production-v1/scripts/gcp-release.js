@@ -4121,7 +4121,10 @@ export async function validateTask8EvidenceArtifact(entry, phase, plan, {
   const privacyEnd = await validatePrivacyProofArtifact(
     entry.privacyProofs.end,
     plan,
-    phase === 'workload' ? workloadEndClock
+    // The end proof is collected after the workload and completes after its
+    // control-plane/log reads. Validate it when it actually existed; the
+    // bracketing checks below still bind it to the recorded workload window.
+    phase === 'workload' ? new Date(entry.privacyProofs.end.observedAt)
       : (historical ? new Date(entry.privacyProofs.end.observedAt) : now),
     errorMessage,
     validatePrivacyProof,

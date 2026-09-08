@@ -9143,7 +9143,9 @@ test('historical Task 8 proofs are validated at their recorded gate instants, no
       gateStartedAt: '2026-08-26T08:00:00.000Z',
       gateEndedAt: '2026-08-26T08:09:00.000Z',
     },
-    validatePrivacyProof: (_proof, { now }) => {
+    validatePrivacyProof: (proof, { now }) => {
+      assert.ok(Date.parse(proof.occurredAt) <= new Date(now).getTime(),
+        'a post-workload proof must be checked at its completion, not before it exists');
       calls.push(new Date(now).toISOString());
       return true;
     },
@@ -9151,7 +9153,7 @@ test('historical Task 8 proofs are validated at their recorded gate instants, no
   assert.notEqual(verified, false);
   assert.deepEqual(calls, [
     '2026-08-26T08:00:00.000Z',
-    '2026-08-26T08:09:00.000Z',
+    '2026-08-26T08:10:00.000Z',
   ]);
 });
 
