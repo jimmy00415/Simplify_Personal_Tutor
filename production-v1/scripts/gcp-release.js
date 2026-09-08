@@ -4177,7 +4177,9 @@ export async function validateTask8EvidenceArtifact(entry, phase, plan, {
         throw new Error(errorMessage);
       }
       const bytes = await readFile(screenshot.filePath);
-      const inspected = inspectPngEvidence(bytes);
+      // Decoder format fields are validated by the PNG parser, not persisted
+      // in the release screenshot metadata contract.
+      const { bitDepth, colorType, ...inspected } = inspectPngEvidence(bytes);
       if (!exact(inspected, {
         width: screenshot.width,
         height: screenshot.height,
