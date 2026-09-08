@@ -165,15 +165,15 @@ export function verifyChallengeBoundUpload(uploadValue, {
       || challenge.seed.length !== 32 || upload.sha256 === base.sha256) fail();
     const uploadedSamples = pcm16(upload.buffer);
     const baseSamples = pcm16(base.buffer);
+    const challengeSamples = pcm16(challenge.bytes);
     let best = { offset: 0, value: -1, count: 0 };
-    for (let offset = -1_600; offset <= 1_600; offset += 8) {
-      const candidate = cosine(baseSamples, uploadedSamples, offset, 8);
+    for (let offset = -1_600; offset <= 1_600; offset += 1) {
+      const candidate = cosine(challengeSamples, uploadedSamples, offset, 1);
       if (candidate.value > best.value) best = { offset, ...candidate };
     }
-    for (let offset = best.offset - 8; offset <= best.offset + 8; offset += 1) {
-      const candidate = cosine(baseSamples, uploadedSamples, offset, 4);
-      if (candidate.value > best.value) best = { offset, ...candidate };
-    }
+    // The base is periodic; its strongest peak alone can select a different
+    // cycle and destroy an otherwise valid one-time watermark comparison.
+    best = { ...best, ...cosine(baseSamples, uploadedSamples, best.offset, 4) };
     const baseStart = Math.max(0, -best.offset);
     const uploadStart = Math.max(0, best.offset);
     const comparedSamples = Math.min(

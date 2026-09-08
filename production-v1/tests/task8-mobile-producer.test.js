@@ -426,6 +426,15 @@ test('one-time WAV watermark is bounded and rejects base, prior, unrelated, sile
   }
 });
 
+test('watermark alignment accepts a real Chromium capture shifted against the periodic base signal', async () => {
+  const base = await readFile(FIXTURE_FILE);
+  const challenge = deriveChallengeWav(base, { seed: Buffer.alloc(32, 0x31) });
+  const upload = await readFile(new URL('./fixtures/mobile-voice-chromium-shifted.wav', import.meta.url));
+  const result = verifyChallengeBoundUpload(upload, { baseValue: base, challenge });
+  assert.equal(result.witnessed, true);
+  assert.ok(result.watermarkCorrelation >= 0.25);
+});
+
 test('matching pinned Chromium launches only from the task-owned D browser cache', async () => {
   const expectedRoot = 'D:\\VS_PROJECT\\Testing\\HongKong_Buddy\\.codex-task-5g-temp\\playwright';
   assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, expectedRoot);
