@@ -1442,6 +1442,10 @@ test('mobile producer derives all thirteen checks from raw browser state and bin
   assert.equal(result.record.browser.realIosSafari, false);
   assert.equal(result.record.browser.pinned, true);
   assert.equal(result.record.fixture.sha256, MOBILE_WAV_CONTRACT.sha256);
+  assert.deepEqual(Object.keys(result.artifacts.screenshots[0].metadata).sort(), [
+    'byteLength', 'colorCount', 'dominantRatio', 'height', 'luminanceSpan',
+    'luminanceVariance', 'nonDominantRatio', 'pixelSha256', 'rawSha256', 'width',
+  ].sort());
   assert.deepEqual(result.record.access, candidateAccess());
   assert.equal(JSON.stringify(result).includes('Authorization'), false);
   assert.equal(JSON.stringify(result).includes('Bearer'), false);

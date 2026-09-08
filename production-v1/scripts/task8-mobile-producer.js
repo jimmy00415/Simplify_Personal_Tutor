@@ -1453,7 +1453,13 @@ export async function runTask8Mobile({
       id,
       filePath: join(dirname(evidenceContract.filePath), `mobile-${id}.png`),
       contents: Buffer.from(bytes),
-      metadata: screenshotResults[index],
+      // The PNG inspector also returns decoder fields and the screenshot ID.
+      // Publish only the exact metadata contract consumed by the controller.
+      metadata: Object.fromEntries([
+        'width', 'height', 'rawSha256', 'pixelSha256', 'colorCount',
+        'luminanceSpan', 'luminanceVariance', 'dominantRatio',
+        'nonDominantRatio', 'byteLength',
+      ].map((key) => [key, screenshotResults[index][key]])),
     }));
     const screenshots = screenshotArtifacts.map(({ id, filePath, metadata }) => deepFreeze({
       id,
