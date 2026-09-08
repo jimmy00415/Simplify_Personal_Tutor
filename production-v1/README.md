@@ -559,7 +559,7 @@ reads plus durable local writes may follow the terminal public mutation.
 The controlled mobile producer is pinned to Playwright `1.62.1`, Chromium
 revision `1234` / browser `151.0.7922.34`, a `390x844` DPR-1 isolated context,
 and canonical one-second PCM16LE 16 kHz mono WAV SHA-256
-`ef989be190f7e9cef40b80516209d972eb08910263ddee3a44f52fdf84e534a7`.
+`92bb7f07a1d1f95bf037dd805f3d5d06fb837a72839698e2b5f10674f095cf33` (GCP-synthesized spoken “Hello”, padded to one second).
 The positive local harness starts the real Production V1 application and uses
 its native authenticated EventSource and product HTTP APIs. For every run, Node
 derives a private temporary WAV by adding a cryptographic low-amplitude

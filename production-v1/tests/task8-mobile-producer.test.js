@@ -186,7 +186,7 @@ async function startLocalProduct(t, { serveUnrelatedMedia = false } = {}) {
   });
   const answerService = {
     async answer({ text }) {
-      if (/private staff-only/i.test(text)) {
+      if (/private staff-only|H\.F\.C\.@Scholars Court/i.test(text)) {
         return {
           text: 'I cannot verify a private staff-only fact. Use the official student guide or contact HKBU.',
           citations: [{
@@ -389,7 +389,7 @@ test('mobile producer locks exact Playwright, Chromium, viewport, and canonical 
     browserVersion: '151.0.7922.34', pinned: true, realIosSafari: false,
   });
   assert.deepEqual(MOBILE_WAV_CONTRACT, {
-    sha256: 'ef989be190f7e9cef40b80516209d972eb08910263ddee3a44f52fdf84e534a7',
+    sha256: '92bb7f07a1d1f95bf037dd805f3d5d06fb837a72839698e2b5f10674f095cf33',
     sampleRate: 16_000, channels: 1, bitsPerSample: 16, durationMs: 1_000,
     mimeType: 'audio/wav',
   });
@@ -427,10 +427,11 @@ test('one-time WAV watermark is bounded and rejects base, prior, unrelated, sile
 });
 
 test('watermark alignment accepts a real Chromium capture shifted against the periodic base signal', async () => {
-  const base = await readFile(FIXTURE_FILE);
-  const challenge = deriveChallengeWav(base, { seed: Buffer.alloc(32, 0x31) });
+  const expectedBaseSha256 = 'ef989be190f7e9cef40b80516209d972eb08910263ddee3a44f52fdf84e534a7';
+  const base = await readFile(new URL('./fixtures/mobile-voice-periodic-base.wav', import.meta.url));
+  const challenge = deriveChallengeWav(base, { seed: Buffer.alloc(32, 0x31), expectedBaseSha256 });
   const upload = await readFile(new URL('./fixtures/mobile-voice-chromium-shifted.wav', import.meta.url));
-  const result = verifyChallengeBoundUpload(upload, { baseValue: base, challenge });
+  const result = verifyChallengeBoundUpload(upload, { baseValue: base, challenge, expectedBaseSha256 });
   assert.equal(result.witnessed, true);
   assert.ok(result.watermarkCorrelation >= 0.25);
 });
@@ -1403,7 +1404,12 @@ test('mobile producer derives all thirteen checks from raw browser state and bin
     executeBrowserFlow: async (options) => {
       lifecycle.push('browser');
       browserOptions = options;
-      return rawFlow();
+      const flow = rawFlow();
+      // A synchronous upload may still be reconciled through correlated GETs.
+      flow.voice.upload.status = 201;
+      flow.voice.upload.location = null;
+      flow.voice.upload.retryAfter = null;
+      return flow;
     },
     controlledBrowserAdapter: true,
     captureControlPlane: async () => ({ stable: true, sha256: '3'.repeat(64) }),

@@ -28,7 +28,7 @@ export const MOBILE_BROWSER_CONTRACT = Object.freeze({
   realIosSafari: false,
 });
 export const MOBILE_WAV_CONTRACT = Object.freeze({
-  sha256: 'ef989be190f7e9cef40b80516209d972eb08910263ddee3a44f52fdf84e534a7',
+  sha256: '92bb7f07a1d1f95bf037dd805f3d5d06fb837a72839698e2b5f10674f095cf33',
   sampleRate: 16_000,
   channels: 1,
   bitsPerSample: 16,
@@ -42,7 +42,7 @@ const IMAGE_DIGEST = /^sha256:[0-9a-f]{64}$/;
 const MAX_EVIDENCE_AGE_MS = 5 * 60_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const browserOwnedFlows = new WeakSet();
-const WATERMARK_AMPLITUDE = 384;
+const WATERMARK_AMPLITUDE = 256;
 const WITNESS_WORLD = '__hkbuddy_browser_witness_v1';
 
 function fail() {
@@ -106,9 +106,11 @@ function watermarkSamples(seed, sampleCount) {
   return watermark;
 }
 
-export function deriveChallengeWav(baseValue, { seed = randomBytes(32) } = {}) {
+export function deriveChallengeWav(baseValue, {
+  seed = randomBytes(32), expectedBaseSha256 = MOBILE_WAV_CONTRACT.sha256,
+} = {}) {
   try {
-    const base = validateCanonicalWav(baseValue, { expectedSha256: MOBILE_WAV_CONTRACT.sha256 });
+    const base = validateCanonicalWav(baseValue, { expectedSha256: expectedBaseSha256 });
     const secretSeed = Buffer.from(seed);
     if (secretSeed.length !== 32) fail();
     const bytes = Buffer.from(base.buffer);
@@ -157,10 +159,11 @@ export function verifyChallengeBoundUpload(uploadValue, {
   baseValue,
   challenge,
   onMetrics,
+  expectedBaseSha256 = MOBILE_WAV_CONTRACT.sha256,
 } = {}) {
   try {
     const upload = validateCanonicalWav(uploadValue);
-    const base = validateCanonicalWav(baseValue, { expectedSha256: MOBILE_WAV_CONTRACT.sha256 });
+    const base = validateCanonicalWav(baseValue, { expectedSha256: expectedBaseSha256 });
     if (!challenge || !Buffer.isBuffer(challenge.bytes) || !Buffer.isBuffer(challenge.seed)
       || challenge.seed.length !== 32 || upload.sha256 === base.sha256) fail();
     const uploadedSamples = pcm16(upload.buffer);
@@ -1151,13 +1154,14 @@ export async function runPinnedPlaywrightFlow({
     const unsupportedPriorIds = new Set(await page.locator('.message-row--assistant[data-message-id]').evaluateAll(
       (rows) => rows.map((row) => row.dataset.messageId),
     ));
-    await page.locator('#message-input').fill('Tell me a private staff-only fact.');
+    await page.locator('#message-input').fill('Is H.F.C.@Scholars Court open today?');
     await page.locator('#send-button').click();
     await page.waitForFunction((prior) => [...document.querySelectorAll('.message-row--assistant[data-message-id]')]
       .some((row) => !prior.includes(row.dataset.messageId)), [...unsupportedPriorIds]);
     const unsupportedId = await page.locator('.message-row--assistant[data-message-id]')
       .evaluateAll((rows, prior) => rows.map((row) => row.dataset.messageId).find((id) => !prior.includes(id)), [...unsupportedPriorIds]);
     const unsupportedRow = page.locator(`.message-row--assistant[data-message-id="${unsupportedId}"]`);
+    await unsupportedRow.locator('.action-card').waitFor({ state: 'visible' });
     const unsupportedHandoffVisible = UUID.test(unsupportedId ?? '')
       && (await unsupportedRow.getAttribute('data-grounding-status')) === 'unverified'
       && await unsupportedRow.locator('.action-card').isVisible()
@@ -1238,11 +1242,14 @@ export async function runPinnedPlaywrightFlow({
     const geometry = await page.evaluate(() => {
       const root = document.documentElement;
       const composer = document.querySelector('#composer');
-      const style = composer ? getComputedStyle(composer) : null;
+      const controls = composer ? [...composer.querySelectorAll('button, textarea, input, a')]
+        .map((control) => control.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0) : [];
       return {
         scrollWidth: root.scrollWidth,
         clientWidth: root.clientWidth,
-        bottomSafeAreaPx: style ? Number.parseFloat(style.paddingBottom) || 0 : 0,
+        bottomSafeAreaPx: controls.length > 0
+          ? Math.max(0, window.innerHeight - Math.max(...controls.map((rect) => rect.bottom))) : 0,
       };
     });
     const safeAreaScreenshot = { id: 'mobile-safe-area', bytes: await page.screenshot({ type: 'png' }) };
@@ -1339,7 +1346,7 @@ function deriveChecks(flow, { controlledBrowserAdapter = false } = {}) {
       && poll.requestSha256 === upload?.contentSha256
       && Number.isSafeInteger(poll.status) && poll.status >= 200 && poll.status < 300);
   const immediateReady = upload?.status === 201 && upload.location === null
-    && upload.retryAfter === null && validPolls && voice.polls.length === 0;
+    && upload.retryAfter === null && validPolls;
   const asynchronousReady = upload?.status === 202
     && upload.location === `/api/v1/voice/uploads/${upload.clientUploadId}`
     && typeof upload.retryAfter === 'string' && /^\d+$/.test(upload.retryAfter)

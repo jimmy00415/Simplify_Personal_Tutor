@@ -877,7 +877,7 @@ blocks. No cloud mutation is permitted after the terminal promotion mutation.
 The deterministic browser contract is Playwright `1.62.1`, Chromium revision
 `1234` / `151.0.7922.34`, `390x844` at DPR 1, four fully opaque PNGs with unique
 encoded and decoded-pixel hashes, and canonical WAV SHA-256
-`ef989be190f7e9cef40b80516209d972eb08910263ddee3a44f52fdf84e534a7`.
+`92bb7f07a1d1f95bf037dd805f3d5d06fb837a72839698e2b5f10674f095cf33` (GCP-synthesized spoken “Hello”, padded to one second).
 Its positive local harness runs the real Production V1 shell, native exact
 EventSource, and product voice/message/media APIs. Node creates a private
 per-run watermarked WAV challenge, verifies the actual Chromium command line,

@@ -6,7 +6,7 @@ import test from 'node:test';
 import { CANONICAL_WAV, validateCanonicalWav } from '../src/media/canonical-wav.js';
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/mobile-voice-en.wav', import.meta.url));
-const FIXED_SHA256 = 'ef989be190f7e9cef40b80516209d972eb08910263ddee3a44f52fdf84e534a7';
+const FIXED_SHA256 = '92bb7f07a1d1f95bf037dd805f3d5d06fb837a72839698e2b5f10674f095cf33';
 
 test('controlled mobile voice fixture is fixed canonical non-silent PCM16LE', async () => {
   const bytes = await readFile(FIXTURE);
