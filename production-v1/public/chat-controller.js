@@ -65,6 +65,7 @@ export function createChatController({
     conversation: null,
     capabilities: normalizeCapabilities(),
     knowledgeSnapshotDate: null,
+    consent: { privacyNoticeVersion: null, aiGranted: false, voiceGranted: false },
     canonicalMessages: [],
     optimisticMessages: [],
     activeTurn: null,
@@ -131,6 +132,7 @@ export function createChatController({
       conversation: state.conversation ? { ...state.conversation } : null,
       capabilities: { ...state.capabilities },
       knowledgeSnapshotDate: state.knowledgeSnapshotDate,
+      consent: { ...state.consent },
       messages: reconcileTimeline(state.canonicalMessages, state.optimisticMessages).map((message) => ({ ...message })),
       activeTurn: state.activeTurn ? { ...state.activeTurn } : null,
       lastMessageSequence: state.lastMessageSequence,
@@ -372,6 +374,7 @@ export function createChatController({
     state.conversation = data.conversation ?? null;
     state.capabilities = normalizeCapabilities(data.capabilities);
     state.knowledgeSnapshotDate = data.knowledgeSnapshotDate ?? null;
+    state.consent = data.consent ?? state.consent;
     state.canonicalMessages = canonicalMessages(data.messages);
     state.optimisticMessages = sameScope ? previousOptimistic : [];
     pruneCanonicallyAcceptedOptimistic();

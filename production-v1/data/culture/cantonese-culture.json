@@ -1,0 +1,34 @@
+{
+  "scenarios": {
+    "freeConversation": {
+      "id": "freeConversation",
+      "label": "Free Conversation",
+      "hint": "Everyday Cantonese small talk. Keep replies short and natural."
+    },
+    "restaurant": {
+      "id": "restaurant",
+      "label": "At the Restaurant",
+      "hint": "Ordering food, asking for less ice or a vegetarian option, and paying."
+    },
+    "meetingPeople": {
+      "id": "meetingPeople",
+      "label": "Meeting New People",
+      "hint": "Names, where you study, and polite follow-up questions."
+    },
+    "traveling": {
+      "id": "traveling",
+      "label": "Traveling in Hong Kong",
+      "hint": "MTR, minibuses, asking for directions, and Octopus."
+    },
+    "shopping": {
+      "id": "shopping",
+      "label": "Shopping Small Talk",
+      "hint": "Prices, sizes, and asking whether something is available."
+    },
+    "workplace": {
+      "id": "workplace",
+      "label": "Workplace Small Talk",
+      "hint": "Greeting colleagues and asking whether someone is free to talk."
+    }
+  }
+}

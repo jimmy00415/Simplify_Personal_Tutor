@@ -2,6 +2,7 @@ import express from 'express';
 
 import { sendError } from './errors.js';
 import { createSessionResolver } from './session.js';
+import { assertVoiceConsent } from '../services/consent.js';
 import { assertVoiceOutputCapability, createVoiceService, voiceLimits } from '../services/voice.js';
 import { acceptanceTimingContext } from '../telemetry/acceptance-timings.js';
 
@@ -88,6 +89,21 @@ function setAuthorizedMediaHeaders(response, asset) {
   response.set('Content-Type', asset.mimeType);
 }
 
+export function createVoiceConsentGate({ config, store } = {}) {
+  const router = express.Router();
+  const resolveSession = createSessionResolver({ store });
+  router.post('/voice/transcriptions', async (request, response, next) => {
+    try {
+      const { session } = await resolveSession(request);
+      assertVoiceConsent(session, config);
+      return next();
+    } catch (error) {
+      return sendError(response, error);
+    }
+  });
+  return router;
+}
+
 export function createVoiceRouter({
   config,
   store,
@@ -112,6 +128,7 @@ export function createVoiceRouter({
     const disconnect = createDisconnectController(request, response);
     try {
       const { session } = await resolveSession(request);
+      assertVoiceConsent(session, config);
       assertCapability(config, 'voiceInput', now);
       const clientUploadId = request.get('x-client-upload-id');
       const requestSha256 = request.get('x-content-sha256');

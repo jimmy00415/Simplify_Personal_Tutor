@@ -29,7 +29,23 @@ function emptySnapshot() {
     sessions: [], conversations: [], messages: [], turns: [], events: [], mediaAssets: [],
     voiceUploads: [], mediaGenerations: [], mediaDeletionJobs: [],
     rateLimitBuckets: [], serviceState: {},
+    visitTurns: [], reports: [],
   };
+}
+
+function conversationKindOf(conversation) {
+  return conversation?.kind ?? 'campus';
+}
+
+function findConversation(snapshot, sessionId, kind = 'campus') {
+  return snapshot.conversations.find((item) => (
+    item.sessionId === sessionId && conversationKindOf(item) === kind
+  )) ?? null;
+}
+
+function optionalList(snapshot, name) {
+  if (!Array.isArray(snapshot[name])) snapshot[name] = [];
+  return snapshot[name];
 }
 
 function validateSnapshotShape(snapshot, collections) {
@@ -365,15 +381,19 @@ export class AtomicFileStore {
         session.tokenHash === tokenHash ? session : matched
       ), null);
       if (existing) {
-        const conversation = snapshot.conversations.find((item) => item.sessionId === existing.id);
+        const conversation = findConversation(snapshot, existing.id, 'campus');
         if (!conversation) throw new Error('Atomic store state is corrupt');
         return { created: false, session: existing, conversation };
       }
       const session = {
         id: randomUUID(), tokenHash, clientScopeId: randomUUID(),
         createdAt: timestamp, updatedAt: timestamp,
+        aiConsentVersion: null, aiConsentAt: null, voiceConsentVersion: null, voiceConsentAt: null,
       };
-      const conversation = { id: randomUUID(), sessionId: session.id, eventHighWater: 0, createdAt: timestamp, updatedAt: timestamp };
+      const conversation = {
+        id: randomUUID(), sessionId: session.id, kind: 'campus',
+        mode: null, scenario: null, eventHighWater: 0, createdAt: timestamp, updatedAt: timestamp,
+      };
       snapshot.sessions.push(session);
       snapshot.conversations.push(conversation);
       return { created: true, session, conversation };
@@ -386,8 +406,121 @@ export class AtomicFileStore {
     ), null)));
   }
 
-  async getConversationForSession({ sessionId }) {
-    return this.#read((snapshot) => clone(snapshot.conversations.find((conversation) => conversation.sessionId === sessionId) ?? null));
+  async getConversationForSession({ sessionId, kind = 'campus' }) {
+    return this.#read((snapshot) => clone(findConversation(snapshot, sessionId, kind)));
+  }
+
+  async getOrCreateConversation({ sessionId, kind, mode = null, scenario = null, now }) {
+    return this.#mutate((snapshot) => {
+      this.#activeSession(snapshot, sessionId);
+      const existing = findConversation(snapshot, sessionId, kind);
+      const timestamp = nowIso(now);
+      if (existing) {
+        if (mode != null) existing.mode = mode;
+        if (scenario != null) existing.scenario = scenario;
+        existing.updatedAt = timestamp;
+        return clone(existing);
+      }
+      if (!['campus', 'practice'].includes(kind)) {
+        throw storeError('INVALID_REQUEST', 'Unsupported conversation kind.');
+      }
+      const conversation = {
+        id: randomUUID(), sessionId, kind, mode, scenario,
+        eventHighWater: 0, createdAt: timestamp, updatedAt: timestamp,
+      };
+      snapshot.conversations.push(conversation);
+      return clone(conversation);
+    });
+  }
+
+  async recordConsent({ sessionId, kinds, version, now }) {
+    return this.#mutate((snapshot) => {
+      const session = this.#activeSession(snapshot, sessionId);
+      const timestamp = nowIso(now);
+      if (kinds.includes('ai')) {
+        session.aiConsentVersion = version;
+        session.aiConsentAt = timestamp;
+      }
+      if (kinds.includes('voice')) {
+        session.voiceConsentVersion = version;
+        session.voiceConsentAt = timestamp;
+      }
+      session.updatedAt = timestamp;
+      return clone(session);
+    });
+  }
+
+  async withdrawVoiceConsent({ sessionId, now }) {
+    return this.#mutate((snapshot) => {
+      const session = this.#activeSession(snapshot, sessionId);
+      session.voiceConsentVersion = null;
+      session.voiceConsentAt = null;
+      session.updatedAt = nowIso(now);
+      return clone(session);
+    });
+  }
+
+  async getConsent({ sessionId }) {
+    return this.#read((snapshot) => clone(this.#activeSession(snapshot, sessionId)));
+  }
+
+  async getVisitTurn({ sessionId, clientTurnId }) {
+    return this.#read((snapshot) => clone(
+      optionalList(snapshot, 'visitTurns').find((item) => item.sessionId === sessionId && item.clientTurnId === clientTurnId) ?? null,
+    ));
+  }
+
+  async createVisitTurn({ sessionId, clientTurnId, sourceText, direction, userJob, inputType, voiceDraftId, result, now }) {
+    return this.#mutate((snapshot) => {
+      this.#activeSession(snapshot, sessionId);
+      const turns = optionalList(snapshot, 'visitTurns');
+      const existing = turns.find((item) => item.sessionId === sessionId && item.clientTurnId === clientTurnId);
+      if (existing) {
+        if (existing.sourceText !== sourceText || existing.direction !== direction) {
+          throw storeError('IDEMPOTENCY_CONFLICT', 'This client turn ID was already used with different content.');
+        }
+        return clone(existing);
+      }
+      const row = {
+        id: randomUUID(),
+        sessionId,
+        clientTurnId,
+        sourceText,
+        direction,
+        effectiveDirection: result.effectiveDirection ?? direction,
+        userJob: userJob ?? null,
+        inputType: inputType ?? 'text',
+        translatedText: result.translatedText,
+        displayText: result.displayText ?? result.translatedText,
+        romanization: result.romanization ?? null,
+        autoRouted: Boolean(result.autoRouted),
+        routeReason: result.routeReason ?? null,
+        needsConfirmation: Boolean(result.needsConfirmation),
+        provider: result.provider,
+        suppressTts: Boolean(result.suppressTts),
+        voiceDraftId: voiceDraftId ?? null,
+        createdAt: nowIso(now),
+      };
+      turns.push(row);
+      return clone(row);
+    });
+  }
+
+  async createReport({ sessionId, messageId, conversationKind, reason, now }) {
+    return this.#mutate((snapshot) => {
+      this.#activeSession(snapshot, sessionId);
+      const reports = optionalList(snapshot, 'reports');
+      const row = {
+        id: randomUUID(),
+        sessionId,
+        messageId: messageId ?? null,
+        conversationKind,
+        reason,
+        createdAt: nowIso(now),
+      };
+      reports.push(row);
+      return clone(row);
+    });
   }
 
   async getAcceptedMessage({ sessionId, conversationId, clientMessageId }) {
@@ -590,7 +723,8 @@ export class AtomicFileStore {
       if (!current) throw new Error('Atomic store state is corrupt');
       messages.push(current);
       const bounded = retainRecentCompletePairs(messages, { maxBytes: contextLimits.turnBytes, contentKey: 'text' });
-      return clone({ turn, messages: bounded });
+      const conversation = snapshot.conversations.find((item) => item.id === turn.conversationId) ?? null;
+      return clone({ turn, messages: bounded, conversation });
     });
   }
 
@@ -1289,6 +1423,8 @@ export class AtomicFileStore {
     snapshot.mediaAssets = snapshot.mediaAssets.filter((item) => item.sessionId !== sessionId);
     snapshot.sessions = snapshot.sessions.filter((item) => item.id !== sessionId);
     snapshot.conversations = snapshot.conversations.filter((item) => item.sessionId !== sessionId);
+    snapshot.visitTurns = optionalList(snapshot, 'visitTurns').filter((item) => item.sessionId !== sessionId);
+    snapshot.reports = optionalList(snapshot, 'reports').filter((item) => item.sessionId !== sessionId);
     snapshot.messages = snapshot.messages.filter((item) => item.sessionId !== sessionId);
     snapshot.turns = snapshot.turns.filter((item) => item.sessionId !== sessionId);
     snapshot.events = snapshot.events.filter((item) => !conversationIds.has(item.conversationId));

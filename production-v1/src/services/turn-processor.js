@@ -11,7 +11,7 @@ function publish(eventHub, result) {
 }
 
 export function createTurnProcessor({
-  store, answerService, voiceService, voiceOutputGate, eventHub, acceptanceTimingRecorder,
+  store, answerService, tutorService, voiceService, voiceOutputGate, eventHub, acceptanceTimingRecorder,
   now = () => new Date(),
 } = {}) {
   if (!store || typeof answerService?.answer !== 'function') throw new Error('turn processor dependencies are required');
@@ -34,11 +34,18 @@ export function createTurnProcessor({
       const ensureGenerating = async () => {
         if (state === 'retrieving') await transition('generating');
       };
-      const answer = await answerService.answer({
+      const practice = (context.conversation?.kind ?? 'campus') === 'practice';
+      const answerer = practice ? tutorService : answerService;
+      if (typeof answerer?.answer !== 'function') {
+        throw Object.assign(new Error('ANSWER_FAILED'), { code: 'ANSWER_FAILED' });
+      }
+      const answer = await answerer.answer({
         turnId: turn.id,
         text: current.text,
         replyLanguage: turn.replyLanguage,
         replyMode: turn.replyMode,
+        mode: context.conversation?.mode ?? 'teaching',
+        scenario: context.conversation?.scenario ?? 'freeConversation',
         context: context.messages,
         signal,
         beforeProvider: async () => {

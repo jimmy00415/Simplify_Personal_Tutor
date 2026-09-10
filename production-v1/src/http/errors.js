@@ -15,6 +15,7 @@ function normalizeError(error = {}) {
   if (error.type === 'entity.too.large' || error.status === 413) return { status: 413, code: 'PAYLOAD_TOO_LARGE' };
   const known = {
     SESSION_NOT_FOUND: 401, NOT_FOUND: 404, IDEMPOTENCY_CONFLICT: 409,
+    AI_CONSENT_REQUIRED: 403, VOICE_CONSENT_REQUIRED: 403,
     INVALID_VOICE_DRAFT: 400, RATE_LIMITED: 429, ORIGIN_NOT_ALLOWED: 403,
     INVALID_EVENT_CURSOR: 400, VOICE_NOT_RELEASE_VERIFIED: 503,
     VOICE_UNSUPPORTED_MEDIA_TYPE: 415, VOICE_UPLOAD_TOO_LARGE: 413,
@@ -40,6 +41,8 @@ function normalizeError(error = {}) {
 function safeMessage(code) {
   const messages = {
     SESSION_NOT_FOUND: 'A valid session is required.',
+    AI_CONSENT_REQUIRED: 'Please accept the AI disclosure before sending.',
+    VOICE_CONSENT_REQUIRED: 'Please accept optional voice transcription first.',
     INVALID_REQUEST: 'The request is invalid.',
     INVALID_VOICE_DRAFT: 'The voice draft is unavailable.',
     PAYLOAD_TOO_LARGE: 'The request body is too large.',

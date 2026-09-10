@@ -7,6 +7,8 @@ import { createLlmProvider } from './providers/llm.js';
 import { createTtsProvider } from './providers/tts.js';
 import { createGoogleAccessTokenProvider } from './providers/google-auth.js';
 import { createAnswerService } from './services/answer.js';
+import { createTutorService } from './services/tutor.js';
+import { createVisitTranslationService } from './services/visit-translation.js';
 import { createDispatcher } from './services/dispatcher.js';
 import { EventHub } from './services/events.js';
 import { createMediaCleanupService } from './services/media-cleanup.js';
@@ -501,6 +503,8 @@ export async function startServer({
     const ttsProvider = suppliedTtsProvider
       ?? (config.tts.available ? createTtsProvider({ config: config.tts, googleAuthProvider }) : null);
     const answerService = createAnswerService({ corpus, retriever, llmProvider, now });
+    const tutorService = createTutorService({ llmProvider, now });
+    const visitService = createVisitTranslationService({ llmProvider });
     eventHub = suppliedEventHub ?? new EventHub();
     cleanupService = suppliedCleanupService ?? createMediaCleanupService({ store, mediaStore, now });
     voiceService = suppliedVoiceService ?? createVoiceService({
@@ -510,6 +514,7 @@ export async function startServer({
     const turnProcessor = createTurnProcessor({
       store,
       answerService,
+      tutorService,
       voiceService,
       voiceOutputGate: () => assertVoiceOutputCapability(config, now()),
       eventHub,
@@ -580,6 +585,8 @@ export async function startServer({
       store,
       mediaStore,
       answerService,
+      tutorService,
+      visitService,
       eventHub,
       dispatcher,
       asrProvider,

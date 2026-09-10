@@ -250,7 +250,13 @@ test('turn api one dispatcher progresses another conversation and stop aborts ev
   });
   dispatcher.start();
   t.after(async () => { releaseBlocked(); await dispatcher.stop(); });
-  await blockedStarted;
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('blocked lane did not start answering')), 2000);
+    blockedStarted.then(() => {
+      clearTimeout(timer);
+      resolve();
+    }, reject);
+  });
   const deadline = Date.now() + 500;
   let quickDelivered = false;
   while (Date.now() < deadline) {

@@ -423,6 +423,43 @@ export function validateIosVoiceEvidence(record, {
   );
 }
 
+export const iosTestflightVoiceEvidenceContract = Object.freeze({
+  schemaVersion: 1,
+  capability: 'ios-testflight-voice',
+  reportSource: 'real-iphone-testflight-manual-v1',
+  normalizerSources: Object.freeze(['web-audio', 'native-wav-v1']),
+  keys: Object.freeze([
+    'schemaVersion', 'commitSha', 'capability', 'bundleId', 'cfBundleVersion',
+    'normalizerContractVersion', 'normalizerSource', 'reportSource',
+    'deviceRunId', 'deviceModelIdentifier', 'iosVersion', 'occurredAt',
+    'result', 'artifactSha256',
+  ]),
+});
+
+export function validateIosTestflightVoiceEvidence(record, {
+  expectedVersion, commitSha, normalizerContractVersion, now,
+}) {
+  return Boolean(
+    hasExactOwnKeys(record, iosTestflightVoiceEvidenceContract.keys)
+    && RELEASE_SHA.test(String(commitSha ?? ''))
+    && artifactValid(record, expectedVersion)
+    && record.schemaVersion === iosTestflightVoiceEvidenceContract.schemaVersion
+    && record.commitSha === commitSha
+    && record.capability === iosTestflightVoiceEvidenceContract.capability
+    && record.bundleId === 'com.simplify.hongkongbuddy'
+    && typeof record.cfBundleVersion === 'string'
+    && record.cfBundleVersion.length > 0
+    && record.normalizerContractVersion === normalizerContractVersion
+    && iosTestflightVoiceEvidenceContract.normalizerSources.includes(record.normalizerSource)
+    && record.reportSource === iosTestflightVoiceEvidenceContract.reportSource
+    && UUID.test(String(record.deviceRunId ?? ''))
+    && /^iPhone\d{1,2},\d{1,2}$/.test(String(record.deviceModelIdentifier ?? ''))
+    && /^\d+(?:\.\d+){1,2}$/.test(String(record.iosVersion ?? ''))
+    && record.result === 'pass'
+    && timeValid(record, now, 90 * DAY_MS),
+  );
+}
+
 export const voiceEvidenceContracts = Object.freeze({
   asr: 'azure-asr-v1',
   googleAsr: 'google-stt-v2-v2',

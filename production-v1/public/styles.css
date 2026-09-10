@@ -90,7 +90,7 @@ a {
 
 .chat-shell {
   display: grid;
-  grid-template-rows: calc(56px + env(safe-area-inset-top)) auto minmax(0, 1fr) auto auto;
+  grid-template-rows: calc(56px + env(safe-area-inset-top)) auto minmax(0, 1fr) auto auto auto;
   width: 100%;
   min-width: 0;
   max-width: 760px;
@@ -1064,6 +1064,89 @@ a {
     border-left: 0;
     border-radius: 20px 20px 0 0;
   }
+}
+
+.app-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
+  gap: 4px;
+  min-height: calc(49px + env(safe-area-inset-bottom));
+  padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--hairline);
+  background: var(--canvas);
+}
+
+.app-tabs button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.app-tabs button[aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.tab-view {
+  overflow: auto;
+  padding: 16px 16px 8px;
+}
+
+.tab-view textarea,
+#practice-input,
+#visit-input {
+  width: 100%;
+  min-height: 72px;
+  font-size: 16px;
+}
+
+.today-shortcuts,
+.visit-jobs,
+.mode-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.habit-card,
+.phrase-of-day,
+.visit-result,
+.phrasebook-card {
+  padding: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.habit-limit {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.legal-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.legal-main h1,
+.legal-main h2 {
+  margin: 16px 0 8px;
+}
+
+.ai-consent {
+  max-width: 420px;
+  border: 0;
+  border-radius: 20px;
+  padding: 0;
+}
+
+.report-answer {
+  min-height: 44px;
 }
 
 @media (prefers-reduced-motion: reduce) {

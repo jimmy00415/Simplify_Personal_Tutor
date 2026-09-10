@@ -531,7 +531,10 @@ export class PostgresStore {
       const existing = await client.query('SELECT * FROM sessions WHERE token_hash = $1 FOR UPDATE', [tokenHash]);
       if (existing.rowCount === 1) {
         const session = mapRow(existing.rows[0]);
-        const conversationResult = await client.query('SELECT * FROM conversations WHERE session_id = $1', [session.id]);
+        const conversationResult = await client.query(
+          `SELECT * FROM conversations WHERE session_id = $1 AND COALESCE(kind, 'campus') = 'campus'`,
+          [session.id],
+        );
         if (conversationResult.rowCount !== 1) throw new Error('PostgreSQL store state is corrupt');
         return { created: false, session, conversation: mapRow(conversationResult.rows[0]) };
       }
@@ -550,8 +553,8 @@ export class PostgresStore {
         pgUnique(error, 'IDEMPOTENCY_CONFLICT', 'The session token is already in use.');
       }
       const insertedConversation = await client.query(`
-        INSERT INTO conversations (id, session_id, event_high_water, created_at, updated_at)
-        VALUES ($1, $2, 0, $3, $3)
+        INSERT INTO conversations (id, session_id, event_high_water, kind, created_at, updated_at)
+        VALUES ($1, $2, 0, 'campus', $3, $3)
         RETURNING *
       `, [conversationId, sessionId, timestamp]);
       return {
@@ -567,9 +570,129 @@ export class PostgresStore {
     return selected.rowCount === 1 ? mapRow(selected.rows[0]) : null;
   }
 
-  async getConversationForSession({ sessionId }) {
-    const selected = await this.pool.query('SELECT * FROM conversations WHERE session_id = $1', [sessionId]);
+  async getConversationForSession({ sessionId, kind = 'campus' }) {
+    const selected = await this.pool.query(
+      `SELECT * FROM conversations WHERE session_id = $1 AND COALESCE(kind, 'campus') = $2`,
+      [sessionId, kind],
+    );
     return selected.rowCount === 1 ? mapRow(selected.rows[0]) : null;
+  }
+
+  async getOrCreateConversation({ sessionId, kind, mode = null, scenario = null, now }) {
+    return this.#transaction(async (client) => {
+      await this.#activeSession(client, sessionId, { lock: true });
+      const existing = await client.query(
+        `SELECT * FROM conversations WHERE session_id = $1 AND COALESCE(kind, 'campus') = $2 FOR UPDATE`,
+        [sessionId, kind],
+      );
+      const timestamp = asIso(now);
+      if (existing.rowCount === 1) {
+        const updated = await client.query(`
+          UPDATE conversations
+          SET mode = COALESCE($3, mode), scenario = COALESCE($4, scenario), updated_at = $5
+          WHERE id = $1
+          RETURNING *
+        `, [existing.rows[0].id, sessionId, mode, scenario, timestamp]);
+        return mapRow(updated.rows[0]);
+      }
+      const inserted = await client.query(`
+        INSERT INTO conversations (id, session_id, event_high_water, kind, mode, scenario, created_at, updated_at)
+        VALUES ($1, $2, 0, $3, $4, $5, $6, $6)
+        RETURNING *
+      `, [randomUUID(), sessionId, kind, mode, scenario, timestamp]);
+      return mapRow(inserted.rows[0]);
+    });
+  }
+
+  async recordConsent({ sessionId, kinds, version, now }) {
+    return this.#transaction(async (client) => {
+      await this.#activeSession(client, sessionId, { lock: true });
+      const timestamp = asIso(now);
+      const updated = await client.query(`
+        UPDATE sessions
+        SET ai_consent_version = CASE WHEN $2 THEN $3 ELSE ai_consent_version END,
+            ai_consent_at = CASE WHEN $2 THEN $4 ELSE ai_consent_at END,
+            voice_consent_version = CASE WHEN $5 THEN $3 ELSE voice_consent_version END,
+            voice_consent_at = CASE WHEN $5 THEN $4 ELSE voice_consent_at END,
+            updated_at = $4
+        WHERE id = $1
+        RETURNING *
+      `, [sessionId, kinds.includes('ai'), version, timestamp, kinds.includes('voice')]);
+      if (updated.rowCount !== 1) throw storeError('SESSION_NOT_FOUND', 'A valid session is required.');
+      return mapRow(updated.rows[0]);
+    });
+  }
+
+  async withdrawVoiceConsent({ sessionId, now }) {
+    return this.#transaction(async (client) => {
+      await this.#activeSession(client, sessionId, { lock: true });
+      const updated = await client.query(`
+        UPDATE sessions
+        SET voice_consent_version = NULL, voice_consent_at = NULL, updated_at = $2
+        WHERE id = $1
+        RETURNING *
+      `, [sessionId, asIso(now)]);
+      if (updated.rowCount !== 1) throw storeError('SESSION_NOT_FOUND', 'A valid session is required.');
+      return mapRow(updated.rows[0]);
+    });
+  }
+
+  async getConsent({ sessionId }) {
+    return this.#activeSession(this.pool, sessionId);
+  }
+
+  async getVisitTurn({ sessionId, clientTurnId }) {
+    const selected = await this.pool.query(
+      'SELECT * FROM visit_turns WHERE session_id = $1 AND client_turn_id = $2',
+      [sessionId, clientTurnId],
+    );
+    return selected.rowCount === 1 ? mapRow(selected.rows[0]) : null;
+  }
+
+  async createVisitTurn({ sessionId, clientTurnId, sourceText, direction, userJob, inputType, voiceDraftId, result, now }) {
+    return this.#transaction(async (client) => {
+      await this.#activeSession(client, sessionId, { lock: true });
+      const existing = await client.query(
+        'SELECT * FROM visit_turns WHERE session_id = $1 AND client_turn_id = $2 FOR UPDATE',
+        [sessionId, clientTurnId],
+      );
+      if (existing.rowCount === 1) {
+        const row = mapRow(existing.rows[0]);
+        if (row.sourceText !== sourceText || row.direction !== direction) {
+          throw storeError('IDEMPOTENCY_CONFLICT', 'This client turn ID was already used with different content.');
+        }
+        return row;
+      }
+      const inserted = await client.query(`
+        INSERT INTO visit_turns (
+          id, session_id, client_turn_id, source_text, direction, effective_direction,
+          user_job, input_type, translated_text, display_text, romanization,
+          auto_routed, route_reason, needs_confirmation, provider, suppress_tts,
+          voice_draft_id, created_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb,
+          $12, $13, $14, $15, $16, $17, $18
+        ) RETURNING *
+      `, [
+        randomUUID(), sessionId, clientTurnId, sourceText, direction,
+        result.effectiveDirection ?? direction, userJob ?? null, inputType ?? 'text',
+        result.translatedText, result.displayText ?? result.translatedText,
+        JSON.stringify(result.romanization ?? null), Boolean(result.autoRouted),
+        result.routeReason ?? null, Boolean(result.needsConfirmation), result.provider,
+        Boolean(result.suppressTts), voiceDraftId ?? null, asIso(now),
+      ]);
+      return mapRow(inserted.rows[0]);
+    });
+  }
+
+  async createReport({ sessionId, messageId, conversationKind, reason, now }) {
+    await this.#activeSession(this.pool, sessionId);
+    const inserted = await this.pool.query(`
+      INSERT INTO answer_reports (id, session_id, message_id, conversation_kind, reason, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [randomUUID(), sessionId, messageId ?? null, conversationKind, reason, asIso(now)]);
+    return mapRow(inserted.rows[0]);
   }
 
   async #findAcceptedMessage(client, { conversationId, clientMessageId }) {
@@ -897,8 +1020,10 @@ export class PostgresStore {
         m.sequence ASC
     `, [turn.userMessageId, turn.conversationId, turn.id]);
     const messages = mapRows(selected.rows).map(({ turnSequence, ...message }) => message);
+    const conversationResult = await this.pool.query('SELECT * FROM conversations WHERE id = $1', [turn.conversationId]);
     return {
       turn,
+      conversation: conversationResult.rowCount === 1 ? mapRow(conversationResult.rows[0]) : null,
       messages: retainRecentCompletePairs(messages, { maxBytes: contextLimits.turnBytes, contentKey: 'text' }),
     };
   }

@@ -8,6 +8,7 @@ import {
   readEvidenceRecord,
   validateIosVoiceEvidence,
   validateSpeechEvidence,
+  validateIosTestflightVoiceEvidence,
   voiceEvidenceContracts,
 } from './services/voice-evidence.js';
 import {
@@ -451,6 +452,7 @@ function publicStatusFor(config, speechEvidence, at) {
   let asrValid = false;
   let ttsValid = false;
   let iosValid = false;
+  let iosTestflightValid = false;
   if (isProduction && config.releaseCommitSha) {
     if (config.asr.available && config.asr.settings.credentialVersion) {
       const contractVersion = config.asr.provider === 'google-stt-v2'
@@ -492,6 +494,12 @@ function publicStatusFor(config, speechEvidence, at) {
       normalizerContractVersion: NORMALIZER_CONTRACT_VERSION,
       now: at,
     });
+    iosTestflightValid = validateIosTestflightVoiceEvidence(speechEvidence.iosTestflight?.record, {
+      expectedVersion: speechEvidence.iosTestflight?.version,
+      commitSha: config.releaseCommitSha,
+      normalizerContractVersion: NORMALIZER_CONTRACT_VERSION,
+      now: at,
+    });
   }
   return {
     productionReady: config.productionReady,
@@ -503,9 +511,13 @@ function publicStatusFor(config, speechEvidence, at) {
     voiceInput: isProduction && asrValid,
     voiceOutput: isProduction && ttsValid,
     iosVoiceCertified: isProduction && iosValid,
+    iosTestflightVoiceCertified: isProduction && iosTestflightValid,
+    iosAppStoreVoiceInput: isProduction && asrValid && iosValid && iosTestflightValid,
+    requireAiConsent: config.requireAiConsent === true,
     asrEvidenceVersion: asrValid ? speechEvidence.asr.version : null,
     ttsEvidenceVersion: ttsValid ? speechEvidence.tts.version : null,
     iosVoiceAcceptanceVersion: iosValid ? speechEvidence.ios.version : null,
+    iosTestflightVoiceAcceptanceVersion: iosTestflightValid ? speechEvidence.iosTestflight.version : null,
     privacyNoticeVersion: config.privacyNoticeVersion ?? null,
     releaseCommitSha: config.releaseCommitSha,
     normalizerContractVersion: NORMALIZER_CONTRACT_VERSION,
@@ -617,6 +629,8 @@ export function loadConfig(environment = process.env, { now = () => new Date() }
     instancePolicy: env.V1_INSTANCE_POLICY,
     privacyNoticeVersion: env.V1_PRIVACY_NOTICE_VERSION,
     privacyNoticeApproved: asBoolean(env.V1_PRIVACY_NOTICE_APPROVED),
+    requireAiConsent: asBoolean(env.V1_REQUIRE_AI_CONSENT)
+      || env.V1_PRIVACY_NOTICE_VERSION === '2026-09-10-ios-combined',
     retentionWorkerEnabled: asBoolean(env.V1_RETENTION_WORKER_ENABLED),
     releaseCommitSha,
     normalizerContractVersion: NORMALIZER_CONTRACT_VERSION,
@@ -636,6 +650,12 @@ export function loadConfig(environment = process.env, { now = () => new Date() }
       asrDaily: rateLimit(env.V1_ASR_LIMIT_DAY, 60),
       tts10m: rateLimit(env.V1_TTS_LIMIT_10M, 5),
       ttsDaily: rateLimit(env.V1_TTS_LIMIT_DAY, 20),
+      practiceMessage5m: rateLimit(env.V1_PRACTICE_MESSAGE_LIMIT_5M, 30),
+      practiceMessageDaily: rateLimit(env.V1_PRACTICE_MESSAGE_LIMIT_DAY, 300),
+      practiceCorrect5m: rateLimit(env.V1_PRACTICE_CORRECT_LIMIT_5M, 20),
+      visitTranslate5m: rateLimit(env.V1_VISIT_TRANSLATE_LIMIT_5M, 30),
+      visitTranslateDaily: rateLimit(env.V1_VISIT_TRANSLATE_LIMIT_DAY, 200),
+      report5m: rateLimit(env.V1_REPORT_LIMIT_5M, 20),
     },
     llm,
     asr: { provider: asrProvider, available: configuredAsr(asrProvider, asrSettings), settings: asrSettings },
@@ -701,6 +721,10 @@ export function loadConfig(environment = process.env, { now = () => new Date() }
     asr: { record: readEvidenceRecord(env.V1_ASR_SMOKE_EVIDENCE_FILE), version: env.V1_ASR_SMOKE_EVIDENCE_VERSION ?? null },
     tts: { record: readEvidenceRecord(env.V1_TTS_SMOKE_EVIDENCE_FILE), version: env.V1_TTS_SMOKE_EVIDENCE_VERSION ?? null },
     ios: { record: readEvidenceRecord(env.V1_IOS_VOICE_ACCEPTANCE_FILE), version: env.V1_IOS_VOICE_ACCEPTANCE_VERSION ?? null },
+    iosTestflight: {
+      record: readEvidenceRecord(env.V1_IOS_TESTFLIGHT_VOICE_ACCEPTANCE_FILE),
+      version: env.V1_IOS_TESTFLIGHT_VOICE_ACCEPTANCE_VERSION ?? null,
+    },
   };
   runtime.getPublicStatus = (at = now()) => publicStatusFor(runtime, speechEvidence, at);
   runtime.publicStatus = runtime.getPublicStatus(now());

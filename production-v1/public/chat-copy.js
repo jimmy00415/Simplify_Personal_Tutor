@@ -73,6 +73,12 @@ export function sendErrorCopy(error = {}) {
   if (error.code === 'SESSION_RECOVERY_FAILED') {
     return 'Your guest session expired. Your draft is kept here, but a new chat could not start yet. Refresh to try again.';
   }
+  if (error.code === 'AI_CONSENT_REQUIRED') {
+    return 'Please accept the AI disclosure before sending.';
+  }
+  if (error.code === 'VOICE_CONSENT_REQUIRED') {
+    return 'Please accept optional voice transcription first.';
+  }
   if (error.code === 'RATE_LIMITED' || error.status === 429) {
     return error.retryAfter
       ? `Your message was not accepted. Wait ${error.retryAfter} seconds before sending again.`

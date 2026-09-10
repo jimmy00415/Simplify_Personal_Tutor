@@ -181,6 +181,12 @@ test('config defaults to a local atomic-file runtime outside production', () => 
     asrDaily: 60,
     tts10m: 5,
     ttsDaily: 20,
+    practiceMessage5m: 30,
+    practiceMessageDaily: 300,
+    practiceCorrect5m: 20,
+    visitTranslate5m: 30,
+    visitTranslateDaily: 200,
+    report5m: 20,
   });
 });
 
@@ -749,9 +755,13 @@ test('config public status contains capability booleans rather than secret value
     voiceInput: false,
     voiceOutput: false,
     iosVoiceCertified: false,
+    iosTestflightVoiceCertified: false,
+    iosAppStoreVoiceInput: false,
+    requireAiConsent: false,
     asrEvidenceVersion: null,
     ttsEvidenceVersion: null,
     iosVoiceAcceptanceVersion: null,
+    iosTestflightVoiceAcceptanceVersion: null,
     privacyNoticeVersion: null,
     releaseCommitSha: null,
     normalizerContractVersion: 'canonical-wav-v1',

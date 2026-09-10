@@ -9,6 +9,11 @@ export const CAPTURE_MIME_TYPES = Object.freeze([
 
 export const VOICE_CAPTURE_MAX_MS = 55_000;
 
+export function detectNativeWavPlugin(capacitor = globalThis.Capacitor) {
+  if (!capacitor?.isNativePlatform?.() || !capacitor.Plugins?.NativeWav) return null;
+  return capacitor.Plugins.NativeWav;
+}
+
 const CANCEL_REASONS = new Set([
   'cancel', 'dispose', 'escape', 'finish-before-start', 'hidden', 'lostpointercapture',
   'pagehide', 'pointercancel', 'visible-cancel',

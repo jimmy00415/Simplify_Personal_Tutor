@@ -5,6 +5,7 @@ import express from 'express';
 import { httpError, sendError } from './errors.js';
 import { createRateLimiter, rateLimitBucket } from '../services/rate-limiter.js';
 import { createEventStreamHandler } from '../services/events.js';
+import { assertAiConsent, publicConsent } from '../services/consent.js';
 import { REPLY_LANGUAGES, REPLY_MODES } from '../stores/store-contract.js';
 import { acceptanceTimingContext } from '../telemetry/acceptance-timings.js';
 
@@ -103,14 +104,34 @@ function publicMessage(message) {
 }
 
 export function createSessionResolver({ store }) {
-  return async function sessionFromRequest(request) {
+  return async function sessionFromRequest(request, { kind = 'campus' } = {}) {
     const token = parseCookies(request.get('cookie'))[COOKIE_NAME];
     if (!token) throw httpError(401, 'SESSION_NOT_FOUND');
     const session = await store.getSessionByTokenHash(tokenHash(token));
     if (!session) throw httpError(401, 'SESSION_NOT_FOUND');
-    const conversation = await store.getConversationForSession({ sessionId: session.id });
-    if (!conversation) throw httpError(401, 'SESSION_NOT_FOUND');
+    const requestedKind = request.query?.kind === 'practice' ? 'practice' : kind;
+    const conversation = await store.getConversationForSession({
+      sessionId: session.id,
+      kind: requestedKind,
+    });
+    if (!conversation) {
+      throw httpError(requestedKind === 'campus' ? 401 : 404, requestedKind === 'campus' ? 'SESSION_NOT_FOUND' : 'NOT_FOUND');
+    }
     return { session, conversation };
+  };
+}
+
+function sessionEnvelope(config, {
+  session, conversation, messages = [], statusCapabilities, includeMessages = true,
+}) {
+  return {
+    session: { id: session.id },
+    clientSessionScope: session.clientScopeId,
+    conversation,
+    ...(includeMessages ? { messages } : {}),
+    capabilities: statusCapabilities,
+    knowledgeSnapshotDate: config.knowledgeSnapshotDate ?? null,
+    consent: publicConsent(session, config.privacyNoticeVersion),
   };
 }
 
@@ -135,7 +156,16 @@ export function createSessionRouter({
           const conversation = await store.getConversationForSession({ sessionId: resumed.id });
           if (!conversation) throw httpError(401, 'SESSION_NOT_FOUND');
           const messages = await store.listMessages({ sessionId: resumed.id, conversationId: conversation.id, after: 0 });
-          return response.json({ data: { session: { id: resumed.id }, clientSessionScope: resumed.clientScopeId, conversation, messages: messages.map(publicMessage), capabilities: currentCapabilities(), knowledgeSnapshotDate: config.knowledgeSnapshotDate ?? null }, error: null, requestId: response.locals.requestId });
+          return response.json({
+            data: sessionEnvelope(config, {
+              session: resumed,
+              conversation,
+              messages: messages.map(publicMessage),
+              statusCapabilities: currentCapabilities(),
+            }),
+            error: null,
+            requestId: response.locals.requestId,
+          });
         }
       }
       const clientInstance = UUID.test(request.get('x-client-instance-id') ?? '')
@@ -154,7 +184,16 @@ export function createSessionRouter({
       const token = randomBytes(32).toString('base64url');
       const sessionData = await store.createOrResumeSession({ tokenHash: tokenHash(token) });
       response.cookie(COOKIE_NAME, token, cookieOptions(config));
-      return response.status(201).json({ data: { session: { id: sessionData.session.id }, clientSessionScope: sessionData.session.clientScopeId, conversation: sessionData.conversation, messages: [], capabilities: currentCapabilities(), knowledgeSnapshotDate: config.knowledgeSnapshotDate ?? null }, error: null, requestId: response.locals.requestId });
+      return response.status(201).json({
+        data: sessionEnvelope(config, {
+          session: sessionData.session,
+          conversation: sessionData.conversation,
+          messages: [],
+          statusCapabilities: currentCapabilities(),
+        }),
+        error: null,
+        requestId: response.locals.requestId,
+      });
     } catch (error) { return sendError(response, error); }
   });
 
@@ -186,6 +225,7 @@ export function createSessionRouter({
   router.post('/messages', async (request, response) => {
     try {
       const sessionData = await sessionFromRequest(request);
+      assertAiConsent(sessionData.session, config);
       const clientMessageId = request.body?.clientMessageId;
       const text = typeof request.body?.text === 'string' ? request.body.text.trim() : '';
       const voiceDraftId = request.body?.voiceDraftId ?? null;

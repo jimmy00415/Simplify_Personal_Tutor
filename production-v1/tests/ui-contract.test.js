@@ -38,6 +38,7 @@ test('ui contract exposes one truthful mobile conversation and no legacy workspa
   assert.match(html, /id="message-feed"[^>]+role="log"[^>]+aria-live="polite"[^>]+aria-atomic="false"/i);
   assert.match(html, /id="turn-status"[^>]+role="status"[^>]+aria-atomic="true"/i);
   assert.match(html, /<h1>Hong Kong Buddy<\/h1>/);
+  assert.match(html, /Campus and Cantonese companion/);
   assert.match(html, /Your HKBU AI senior/);
   assert.match(html, /class="info-button"[^>]*>Info<\/button>/i);
   assert.match(html, /id="assistant-info"/);
@@ -48,7 +49,8 @@ test('ui contract exposes one truthful mobile conversation and no legacy workspa
   assert.match(html, /id="message-template"/);
   assert.match(html, /id="source-template"/);
   assert.match(html, /id="action-card-template"/);
-  assert.doesNotMatch(html, />\s*(?:MODE|SCENARIO|START MISSION|Free Talk|Teaching)\s*</i);
+  const campusHtml = html.slice(html.indexOf('id="message-list"'), html.indexOf('id="practice-view"'));
+  assert.doesNotMatch(campusHtml, />\s*(?:MODE|SCENARIO|START MISSION|Free Talk|Teaching)\s*</i);
   assert.doesNotMatch(html, /\btyping\b|\bonline\b|\bseen\b|last active|read receipt/i);
   assert.doesNotMatch(html, /aria-label="[^"]*(?:phone call|video call)|data-(?:online|presence|read-receipt)|class="[^"]*(?:online-dot|typing-dots|call-waveform)/i);
 });
@@ -254,9 +256,9 @@ test('ui contract publishes a self-contained mobile web app manifest', async () 
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(html, /rel="apple-touch-icon" href="\/assets\/ai-senior-avatar\.png"/);
   assert.deepEqual(manifest, {
-    name: 'Hong Kong Buddy · Campus AI Senior',
+    name: 'Hong Kong Buddy · Campus and Cantonese companion',
     short_name: 'HK Buddy',
-    description: 'A grounded AI senior for everyday HKBU questions.',
+    description: 'Campus next steps and everyday Cantonese practice for HKBU students. An AI assistant, not official HKBU.',
     start_url: '/',
     scope: '/',
     display: 'standalone',
@@ -276,6 +278,8 @@ test('ui contract syntax check covers every shipped client module', async () => 
   const check = packageJson.scripts.check;
 
   assert.match(check, /node --check public\/app\.js/);
+  assert.match(check, /node --check public\/app-shell\.js/);
+  assert.match(check, /node --check public\/consent-controller\.js/);
   assert.match(check, /node --check public\/chat-controller\.js/);
   assert.match(check, /node --check public\/chat-state\.js/);
   assert.match(check, /node --check public\/message-renderer\.js/);

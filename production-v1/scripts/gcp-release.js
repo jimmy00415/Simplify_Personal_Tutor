@@ -6745,6 +6745,11 @@ export async function runGcpRelease({
         );
         resumeOperationId = existingJournalIntent?.operationId ?? null;
       } else {
+        if (!unresolvedTask8Contract(plan.task8Evidence.mobile)) {
+          const error = new Error('Pre-existing mobile evidence is forbidden');
+          error.code = 'MOBILE_PREBUILT_EVIDENCE_FORBIDDEN';
+          throw error;
+        }
         mobileStage = 'executor';
         mobileExecutor = execute ?? createDefaultGcloudExecutor({ environment });
         mobileStage = 'producer';

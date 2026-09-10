@@ -1,4 +1,11 @@
+import { createAppShell } from './app-shell.js';
 import { createChatController } from './chat-controller.js';
+import { createConsentController } from './consent-controller.js';
+import { chromeCopy } from './legal-copy.js';
+import { createPhrasebookView } from './phrasebook-view.js';
+import { createPracticeView } from './practice-view.js';
+import { createTodayView, markHabitPractised } from './today-view.js';
+import { createVisitView } from './visit-view.js';
 import {
   chatExperienceCopy,
   clearErrorCopy,
@@ -1169,7 +1176,113 @@ window.addEventListener('pageshow', (event) => {
   if (event.persisted) window.location.reload();
 });
 
-void chatController.start().catch((error) => {
+const appShell = createAppShell({
+  root: shell,
+  tabButtons: [...document.querySelectorAll('#app-tabs [data-tab]')],
+  views: {
+    today: document.querySelector('#today-view'),
+    campus: null,
+    practice: document.querySelector('#practice-view'),
+    translate: document.querySelector('#translate-view'),
+  },
+  campusNodes: [
+    document.querySelector('#message-list'),
+    document.querySelector('#turn-status'),
+    document.querySelector('#composer'),
+  ],
+});
+const todayView = createTodayView({
+  greeting: document.querySelector('#today-greeting'),
+  habitStatus: document.querySelector('#habit-status'),
+  phraseText: document.querySelector('#phrase-of-day-text'),
+});
+const practiceView = createPracticeView({
+  feed: document.querySelector('#practice-feed'),
+  input: document.querySelector('#practice-input'),
+  form: document.querySelector('#practice-composer'),
+  correctButton: document.querySelector('#practice-correct'),
+  modeButtons: [...document.querySelectorAll('#practice-mode-teaching, #practice-mode-freeChat')],
+  scenario: document.querySelector('#practice-scenario'),
+  status: document.querySelector('#practice-status'),
+  onFirstDelivery: () => {
+    markHabitPractised();
+    todayView.render({ language: chatController.snapshot().replyLanguage });
+  },
+});
+const visitView = createVisitView({
+  form: document.querySelector('#visit-composer'),
+  input: document.querySelector('#visit-input'),
+  direction: document.querySelector('#visit-direction'),
+  result: document.querySelector('#visit-result'),
+  display: document.querySelector('#visit-display'),
+  romanization: document.querySelector('#visit-romanization'),
+  jobButtons: [...document.querySelectorAll('.visit-job')],
+});
+const phrasebookView = createPhrasebookView({
+  list: document.querySelector('#phrasebook-list'),
+  onPractise: (phrase) => {
+    const input = document.querySelector('#practice-input');
+    if (input) input.value = phrase.cantonese;
+    appShell.show('practice');
+  },
+  onTranslate: (phrase) => {
+    const input = document.querySelector('#visit-input');
+    if (input) input.value = phrase.cantonese;
+    appShell.show('translate');
+  },
+});
+const consentController = createConsentController({
+  dialog: document.querySelector('#ai-consent'),
+  title: document.querySelector('#ai-consent-title'),
+  copy: document.querySelector('#ai-consent-copy'),
+  continueButton: document.querySelector('#ai-consent-continue'),
+  leaveButton: document.querySelector('#ai-consent-leave'),
+});
+void visitView;
+document.querySelector('#open-phrasebook')?.addEventListener('click', () => {
+  phrasebookView.render();
+  document.querySelector('#phrasebook-sheet')?.showModal?.();
+});
+document.querySelector('[data-close-sheet="phrasebook-sheet"]')?.addEventListener('click', () => {
+  document.querySelector('#phrasebook-sheet')?.close?.();
+});
+for (const button of document.querySelectorAll('[data-go-tab]')) {
+  button.addEventListener('click', () => appShell.show(button.dataset.goTab));
+}
+document.querySelector('#practise-phrase')?.addEventListener('click', () => appShell.show('practice'));
+document.querySelector('#translate-phrase')?.addEventListener('click', () => appShell.show('translate'));
+document.addEventListener('click', async (event) => {
+  const button = event.target?.closest?.('.report-answer');
+  if (!button?.dataset.messageId) return;
+  await fetch('/api/v1/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messageId: button.dataset.messageId,
+      conversationKind: appShell.current() === 'practice' ? 'practice' : 'campus',
+      reason: 'other',
+    }),
+  }).catch(() => undefined);
+});
+
+void chatController.start().then((snapshot) => {
+  const language = snapshot?.replyLanguage ?? 'en';
+  todayView.render({ language });
+  phrasebookView.render();
+  const notice = snapshot?.consent?.privacyNoticeVersion ?? snapshot?.capabilities?.privacyNoticeVersion;
+  const aiDialog = document.querySelector('#ai-consent');
+  if (aiDialog && notice) aiDialog.dataset.noticeVersion = notice;
+  consentController.show({
+    required: snapshot?.capabilities?.requireAiConsent === true,
+    alreadyGranted: snapshot?.consent?.aiGranted === true,
+    language,
+  });
+  if (consentController.hasLeft()) {
+    connectionStatus.hidden = false;
+    connectionStatus.textContent = chromeCopy(language).leaveOnly;
+  }
+  appShell.show('campus');
+}).catch((error) => {
   const copy = startErrorCopy(error);
   connectionStatus.hidden = false;
   connectionStatus.textContent = copy;

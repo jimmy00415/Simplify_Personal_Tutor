@@ -282,7 +282,15 @@ values. The production boundary uses these setting names:
 - voice evidence: `V1_ASR_SMOKE_EVIDENCE_FILE`,
   `V1_ASR_SMOKE_EVIDENCE_VERSION`, `V1_TTS_SMOKE_EVIDENCE_FILE`,
   `V1_TTS_SMOKE_EVIDENCE_VERSION`, `V1_IOS_VOICE_ACCEPTANCE_FILE`,
-  `V1_IOS_VOICE_ACCEPTANCE_VERSION`
+  `V1_IOS_VOICE_ACCEPTANCE_VERSION`,
+  `V1_IOS_TESTFLIGHT_VOICE_ACCEPTANCE_FILE`,
+  `V1_IOS_TESTFLIGHT_VOICE_ACCEPTANCE_VERSION`
+
+Combined App Store launch (Today / Campus / Practice / Translate) uses the
+same Cloud Run origin. Apply `migrations/002_ios_combined.sql` before enabling
+`V1_PRIVACY_NOTICE_VERSION=2026-09-10-ios-combined` or `V1_REQUIRE_AI_CONSENT`.
+App Store voice stays off until both Safari and TestFlight evidence files pass.
+See `docs/app-store/submit-checklist.md`.
 
 Production database and GCS selection accepts only V1-prefixed settings.
 Production LLM selection follows the same V1-only rule. Unprefixed settings are

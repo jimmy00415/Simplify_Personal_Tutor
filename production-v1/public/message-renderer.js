@@ -168,13 +168,17 @@ export function createMessageElement(document, message, {
   const retry = element(document, 'button', 'retry-message', 'Retry send');
   retry.type = 'button';
   retry.hidden = true;
+  const report = element(document, 'button', 'report-answer', 'Report');
+  report.type = 'button';
+  report.hidden = role !== 'assistant' || Boolean(message?.optimistic);
+  if (!report.hidden) report.dataset.messageId = String(message?.id ?? '');
   if (['unconfirmed', 'retryable-rejection'].includes(message?.sendState)
     && typeof onRetry === 'function') {
     retry.hidden = false;
     retry.dataset.clientMessageId = String(message.clientMessageId ?? '');
     retry.addEventListener('click', () => onRetry(message.clientMessageId));
   }
-  meta.append(time, status, retry);
+  meta.append(time, status, retry, report);
   stack.append(meta);
 
   article.append(avatar, stack);

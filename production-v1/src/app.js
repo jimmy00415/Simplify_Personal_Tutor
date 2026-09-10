@@ -5,8 +5,13 @@ import helmet from 'helmet';
 
 import { requireSameOrigin } from './http/security.js';
 import { sendError } from './http/errors.js';
+import { createConsentRouter } from './http/consent.js';
+import { createLegalRouter } from './http/legal.js';
+import { createPracticeRouter } from './http/practice.js';
+import { createReportRouter } from './http/report.js';
 import { createSessionRouter } from './http/session.js';
-import { createVoiceRouter } from './http/voice.js';
+import { createVisitRouter } from './http/visit.js';
+import { createVoiceConsentGate, createVoiceRouter } from './http/voice.js';
 import { EventHub } from './services/events.js';
 
 const publicDirectory = fileURLToPath(new URL('../public/', import.meta.url));
@@ -44,6 +49,7 @@ export function createApp({
   config, store, mediaStore, answerService, eventHub, dispatcher,
   asrProvider, ttsProvider, cleanupService, voiceService, spoolParentDirectory,
   readiness, runtimeState, acceptanceTimingRecorder,
+  tutorService, visitService,
   now = () => new Date(),
 } = {}) {
   void answerService;
@@ -77,6 +83,9 @@ export function createApp({
   });
   app.use(requireSameOrigin(config.allowedOrigins ?? config.publicOrigin));
   const selectedEventHub = store ? (eventHub ?? new EventHub()) : null;
+  if (store) {
+    app.use('/api/v1', createVoiceConsentGate({ config, store }));
+  }
   if (store && mediaStore) {
     app.use('/api/v1', createVoiceRouter({
       config, store, mediaStore, asrProvider, ttsProvider, cleanupService,
@@ -106,7 +115,16 @@ export function createApp({
       config, store, eventHub: selectedEventHub, dispatcher, cleanupService,
       acceptanceTimingRecorder, now,
     }));
+    app.use('/api/v1', createConsentRouter({ config, store, now }));
+    app.use('/api/v1', createPracticeRouter({
+      config, store, eventHub: selectedEventHub, dispatcher, tutorService, now,
+    }));
+    app.use('/api/v1', createVisitRouter({
+      config, store, visitService, now,
+    }));
+    app.use('/api/v1', createReportRouter({ config, store, now }));
   }
+  app.use('/legal', createLegalRouter());
   app.use('/api', (request, response) => {
     response.status(404).json(envelope(response, null, { code: 'NOT_FOUND', message: 'The requested API route does not exist.' }));
   });

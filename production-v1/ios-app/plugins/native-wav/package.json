@@ -1,0 +1,6 @@
+{
+  "name": "native-wav",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional native 16 kHz mono WAV capture when WKWebView Web Audio is silent."
+}

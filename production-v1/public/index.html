@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#f5f1ec">
-    <meta name="description" content="Ask a grounded AI senior about everyday life at HKBU.">
-    <title>Hong Kong Buddy | Your HKBU AI senior</title>
+    <meta name="description" content="Campus next steps and everyday Cantonese practice for HKBU students. An AI assistant, not official HKBU.">
+    <title>Hong Kong Buddy | Campus and Cantonese companion</title>
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/assets/ai-senior-avatar.png">
     <link rel="stylesheet" href="/styles.css">
@@ -17,7 +17,7 @@
           <img class="profile-avatar profile-avatar--header" src="/assets/ai-senior-avatar-128.png" alt="">
           <div class="profile-copy">
             <h1>Hong Kong Buddy</h1>
-            <p>Your HKBU AI senior</p>
+            <p id="app-subtitle">Campus and Cantonese companion</p>
           </div>
           <button class="info-button" type="button" aria-label="Information about Hong Kong Buddy" aria-controls="assistant-info" aria-expanded="false">Info</button>
         </header>
@@ -30,9 +30,9 @@
               <img class="profile-avatar message-avatar" src="/assets/ai-senior-avatar-128.png" alt="">
               <div class="message-stack">
                 <div class="message-bubble message-bubble--assistant">
-                  <p id="welcome-message">Hi — I’m Hong Kong Buddy, your HKBU AI senior. Ask me about registration, halls, food, campus services, transport, or settling into Hong Kong.</p>
+                  <p id="welcome-message">Hi — I’m Hong Kong Buddy, your HKBU AI senior. Ask me about registration, halls, food, campus services, transport, or settling into Hong Kong. This is an AI assistant, not official HKBU.</p>
                 </div>
-                <p id="welcome-disclosure" class="ai-disclosure">Campus facts include official sources.</p>
+                <p id="welcome-disclosure" class="ai-disclosure">Your HKBU AI senior. Campus facts include official sources.</p>
               </div>
             </div>
 
@@ -86,8 +86,108 @@
             <img src="/assets/simplify-wordmark.svg" alt="Simplify">
           </div>
         </form>
+
+        <section id="today-view" class="tab-view" hidden>
+          <p id="today-greeting">Good to see you.</p>
+          <article id="habit-card" class="habit-card">
+            <h2>Today’s practice</h2>
+            <p id="habit-status">Not practised yet</p>
+            <p class="habit-limit">Saved on this iPhone only.</p>
+          </article>
+          <div class="today-shortcuts">
+            <button type="button" data-go-tab="campus">Ask campus</button>
+            <button type="button" data-go-tab="practice">Start practice</button>
+            <button type="button" data-go-tab="translate">Open translator</button>
+          </div>
+          <article id="phrase-of-day" class="phrase-of-day">
+            <h2>Phrase of the day</h2>
+            <p id="phrase-of-day-text"></p>
+            <div class="today-shortcuts">
+              <button type="button" id="practise-phrase">Practise this</button>
+              <button type="button" id="translate-phrase">Translate with this</button>
+            </div>
+          </article>
+          <button type="button" id="open-phrasebook">Phrasebook</button>
+        </section>
+
+        <section id="practice-view" class="tab-view" hidden>
+          <p>Conversation practice, not pronunciation assessment.</p>
+          <div class="mode-toggle" role="group" aria-label="Practice mode">
+            <button type="button" id="practice-mode-teaching" aria-pressed="true">Teaching</button>
+            <button type="button" id="practice-mode-freeChat" aria-pressed="false">Free Talk</button>
+          </div>
+          <label class="sr-only" for="practice-scenario">Practice topic</label>
+          <select id="practice-scenario">
+            <option value="freeConversation">Free Conversation</option>
+            <option value="restaurant">At the Restaurant</option>
+            <option value="meetingPeople">Meeting New People</option>
+            <option value="traveling">Traveling in Hong Kong</option>
+            <option value="shopping">Shopping Small Talk</option>
+            <option value="workplace">Workplace Small Talk</option>
+          </select>
+          <div id="practice-feed" class="message-feed" role="log" aria-live="polite"></div>
+          <form id="practice-composer">
+            <label class="sr-only" for="practice-input">Practice message</label>
+            <textarea id="practice-input" maxlength="4000" placeholder="Type in Cantonese or English"></textarea>
+            <button type="submit" id="practice-send">Send</button>
+            <button type="button" id="practice-correct">Correct Me</button>
+          </form>
+          <p id="practice-status" role="status"></p>
+        </section>
+
+        <section id="translate-view" class="tab-view" hidden>
+          <p>Supervised visit translation. Ask staff to confirm important meaning.</p>
+          <div class="visit-jobs">
+            <button type="button" class="visit-job" data-job="resident" data-direction="yue_to_en">Resident speaks Cantonese</button>
+            <button type="button" class="visit-job" data-job="volunteer" data-direction="en_to_yue">Volunteer speaks English or Mandarin</button>
+          </div>
+          <label class="sr-only" for="visit-direction">Direction</label>
+          <select id="visit-direction">
+            <option value="yue_to_en">Cantonese to English</option>
+            <option value="yue_to_zh">Cantonese to Mandarin</option>
+            <option value="en_to_yue">English to Cantonese</option>
+            <option value="zh_to_yue">Mandarin to Cantonese</option>
+          </select>
+          <form id="visit-composer">
+            <label class="sr-only" for="visit-input">Visit text</label>
+            <textarea id="visit-input" maxlength="4000" placeholder="Type what was said"></textarea>
+            <button type="submit" id="visit-send">Translate</button>
+          </form>
+          <article id="visit-result" class="visit-result" hidden>
+            <p id="visit-display"></p>
+            <p id="visit-romanization"></p>
+          </article>
+        </section>
+
+        <nav id="app-tabs" class="app-tabs" aria-label="Hong Kong Buddy">
+          <button type="button" data-tab="today">Today</button>
+          <button type="button" data-tab="campus" aria-current="page">Campus</button>
+          <button type="button" data-tab="practice">Practice</button>
+          <button type="button" data-tab="translate">Translate</button>
+        </nav>
       </div>
     </div>
+
+    <dialog id="ai-consent" class="ai-consent" aria-labelledby="ai-consent-title" aria-describedby="ai-consent-copy">
+      <div class="voice-consent-card">
+        <p class="sheet-eyebrow">Before you start</p>
+        <h2 id="ai-consent-title">Use this AI assistant?</h2>
+        <p id="ai-consent-copy">Hong Kong Buddy is an AI assistant, not an official HKBU representative. Typed text is stored in Hong Kong and sent to Google Vertex AI using the global endpoint. Optional voice uploads a recording to Google Speech-to-Text in Singapore before you tap Send. Generated voice uses Google Text-to-Speech in Singapore. Guest history does not follow you to another device. Clear conversation revokes this session.</p>
+        <p><a href="/legal/privacy">Privacy</a> · <a href="/legal/support">Support</a></p>
+        <div class="voice-consent-actions">
+          <button id="ai-consent-continue" type="button">Continue</button>
+          <button id="ai-consent-leave" type="button">Leave</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="phrasebook-sheet" class="assistant-info" aria-labelledby="phrasebook-title">
+      <div class="sheet-heading">
+        <h2 id="phrasebook-title">Phrasebook</h2>
+        <button class="close-button" type="button" data-close-sheet="phrasebook-sheet">Close</button>
+      </div>
+      <div id="phrasebook-list" class="phrasebook-list"></div>
+    </dialog>
 
     <dialog id="reply-preferences" class="reply-preferences" aria-labelledby="reply-preferences-title" aria-describedby="reply-preferences-description">
       <form id="reply-preferences-form" method="dialog">
@@ -158,6 +258,7 @@
         <section>
           <h3>Privacy and data use</h3>
           <p>Text you send may be processed by the configured AI provider to produce an answer. Voice is optional: a recording is uploaded only after you choose the voice feature, and its transcript remains editable and unsent until you tap Send. Use Clear conversation below to revoke this guest session and queue its stored data for deletion.</p>
+          <p><a href="/legal/privacy">Full privacy notice</a> · <a href="/legal/support">Support, access, and correction</a></p>
         </section>
       </div>
 
@@ -184,6 +285,7 @@
             <time class="message-time"></time>
             <span class="message-state"></span>
             <button class="retry-message" type="button" hidden>Retry</button>
+            <button class="report-answer" type="button" hidden>Report</button>
           </div>
         </div>
       </article>

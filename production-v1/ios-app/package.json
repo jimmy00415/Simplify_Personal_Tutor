@@ -1,0 +1,13 @@
+{
+  "name": "hong-kong-buddy-ios",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Capacitor shell for Hong Kong Buddy. Generate the Xcode project on hosted macOS.",
+  "scripts": {
+    "sync": "npx cap sync ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.4.2",
+    "@capacitor/ios": "^7.4.2"
+  }
+}

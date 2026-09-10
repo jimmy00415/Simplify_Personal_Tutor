@@ -153,7 +153,10 @@ test('postgres adapter exposes every storage operation used by HTTP and backgrou
   const store = new PostgresStore({ pool: new RecordingPool() });
   const methods = [
     'init', 'close', 'createOrResumeSession', 'getSessionByTokenHash',
-    'getConversationForSession', 'getAcceptedMessage', 'acceptMessage',
+    'getConversationForSession', 'getOrCreateConversation', 'recordConsent',
+    'withdrawVoiceConsent', 'getConsent', 'getVisitTurn', 'createVisitTurn',
+    'createReport',
+    'getAcceptedMessage', 'acceptMessage',
     'acceptMessageWithRateLimits', 'listMessages', 'getActiveTurn', 'claimNextTurn',
     'renewTurnLease', 'setTurnState', 'getTurnContext', 'failTurn',
     'deliverAssistant', 'claimVoiceUploadWithRateLimits', 'renewVoiceUploadLease',

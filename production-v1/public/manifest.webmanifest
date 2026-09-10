@@ -1,7 +1,7 @@
 {
-  "name": "Hong Kong Buddy · Campus AI Senior",
+  "name": "Hong Kong Buddy · Campus and Cantonese companion",
   "short_name": "HK Buddy",
-  "description": "A grounded AI senior for everyday HKBU questions.",
+  "description": "Campus next steps and everyday Cantonese practice for HKBU students. An AI assistant, not official HKBU.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

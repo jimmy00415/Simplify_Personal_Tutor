@@ -1,0 +1,36 @@
+workflows:
+  ios-testflight:
+    name: Hong Kong Buddy iOS TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: 26
+      node: 22
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.simplify.hongkongbuddy
+    scripts:
+      - name: Sync Capacitor iOS project
+        script: |
+          cd production-v1/ios-app
+          npm ci
+          npx cap add ios || true
+          npx cap sync ios
+      - name: Archive with iOS 26 SDK
+        script: |
+          xcodebuild -project production-v1/ios-app/ios/App/App.xcodeproj \
+            -scheme App \
+            -sdk iphoneos \
+            -configuration Release \
+            IPHONEOS_DEPLOYMENT_TARGET=18.0 \
+            -archivePath $CM_BUILD_DIR/HongKongBuddy.xcarchive \
+            archive
+      - name: Export and upload TestFlight
+        script: |
+          xcodebuild -exportArchive \
+            -archivePath $CM_BUILD_DIR/HongKongBuddy.xcarchive \
+            -exportOptionsPlist production-v1/ios-app/ci/ExportOptions.plist \
+            -exportPath $CM_BUILD_DIR/export
+          # Operator supplies App Store Connect API key outside git.
+    artifacts:
+      - $CM_BUILD_DIR/export/*.ipa

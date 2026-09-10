@@ -1,0 +1,7 @@
+node_modules/
+ios/
+android/
+*.p8
+*.p12
+*.mobileprovision
+AuthKey_*.p8
